@@ -1,0 +1,13 @@
+bin/
+obj/
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+frontend/.vite/
+backend/**/bin/
+backend/**/obj/
+*.user
+*.suo
+backend/Pecenje.Api/appsettings.Local.json

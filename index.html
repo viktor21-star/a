@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="mk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#b33b18">
+  <title>Pecenje Evidencija</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero__brand">PE</div>
+      <div>
+        <p class="eyebrow">Zito Marketi</p>
+        <h1>Pecenje Evidencija</h1>
+        <p class="hero__text">Centralna aplikacija za najava po market, vnes na pecenje i dnevni/mesecni izveshtai.</p>
+      </div>
+    </header>
+
+    <div id="statusBanner" class="status-banner" data-type="info">Aplikacijata e spremna.</div>
+
+    <main>
+      <section id="authSection" class="card auth-card">
+        <div class="section-title">
+          <h2>Najava</h2>
+          <button id="installButton" class="secondary-button" hidden>Instaliraj app</button>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <label>
+            <span>Kod na market</span>
+            <input name="marketCode" type="text" placeholder="Primer: aerodrom1" required>
+          </label>
+
+          <label>
+            <span>PIN</span>
+            <input name="pin" type="password" placeholder="Vnesi PIN" required>
+          </label>
+
+          <button type="submit" class="primary-button">Najavi se</button>
+        </form>
+
+        <div class="auth-help">
+          <p>Primer logini za start:</p>
+          <p><strong>admin</strong> / <strong>1234</strong></p>
+          <p><strong>aerodrom1</strong> / <strong>1111</strong></p>
+          <p><strong>centar</strong> / <strong>2222</strong></p>
+        </div>
+      </section>
+
+      <section id="dashboardSection" class="layout" hidden>
+        <section class="card dashboard-header">
+          <div>
+            <p class="eyebrow">Najaven korisnik</p>
+            <h2 id="currentMarket">-</h2>
+            <p id="currentRole" class="hero__text"></p>
+          </div>
+          <button id="logoutButton" class="secondary-button" type="button">Odjava</button>
+        </section>
+
+        <section class="card">
+          <div class="section-title">
+            <h2>Izveshtai</h2>
+          </div>
+
+          <div class="filters filters--reports">
+            <label>
+              <span>Period</span>
+              <select id="reportPeriod">
+                <option value="daily">Dneven</option>
+                <option value="monthly">Mesecen</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Datum</span>
+              <input id="reportDate" type="date">
+            </label>
+          </div>
+
+          <div id="reportCards" class="report-cards"></div>
+          <div id="reportBreakdown" class="market-report-list"></div>
+        </section>
+
+        <div class="layout">
+          <section class="card">
+            <div class="section-title">
+              <h2>Nov vnes</h2>
+            </div>
+
+            <form id="entryForm" class="entry-form">
+              <label>
+                <span>Tip na pecenje</span>
+                <select id="roastType" name="roastType" required>
+                  <option value="pekara">Pekara</option>
+                  <option value="pilinja">Pilinja</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Datum i vreme</span>
+                <input id="entryDate" name="entryDate" type="datetime-local" required>
+              </label>
+
+              <div class="items-section">
+                <div class="items-section__header">
+                  <span>Artikli za pecenje</span>
+                  <button id="addItemButton" class="secondary-button" type="button">Dodaj artikl</button>
+                </div>
+                <div id="itemsList" class="items-list"></div>
+              </div>
+
+              <label>
+                <span>Zabeleshka</span>
+                <textarea id="itemNote" name="itemNote" rows="3" placeholder="Opcionalno"></textarea>
+              </label>
+
+              <button type="submit" class="primary-button">Zachuvaj vnes</button>
+            </form>
+          </section>
+
+          <section class="card">
+            <div class="section-title">
+              <h2>Centralni zapisi</h2>
+              <button id="exportButton" class="secondary-button" type="button">Eksport JSON</button>
+            </div>
+
+            <div class="filters">
+              <label>
+                <span>Filtriraj tip</span>
+                <select id="filterType">
+                  <option value="">Site tipovi</option>
+                  <option value="pekara">Pekara</option>
+                  <option value="pilinja">Pilinja</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="summary" class="summary"></div>
+            <div id="entries" class="entries" aria-live="polite"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <template id="entryTemplate">
+    <article class="entry">
+      <div class="entry__top">
+        <div>
+          <p class="entry__market"></p>
+          <p class="entry__meta"></p>
+        </div>
+        <button class="danger-button" type="button">Izbrishi</button>
+      </div>
+      <div class="entry__body">
+        <div class="pill"></div>
+        <div class="entry__items"></div>
+        <p class="entry__note"></p>
+      </div>
+    </article>
+  </template>
+
+  <template id="itemRowTemplate">
+    <div class="item-row">
+      <input class="item-row__name" type="text" placeholder="Artikl" required>
+      <input class="item-row__qty" type="number" min="1" step="1" placeholder="Kolicina" required>
+      <button class="danger-button item-row__remove" type="button">Trgni</button>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

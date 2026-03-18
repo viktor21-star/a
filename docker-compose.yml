@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: pecenje-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Your_strong_Password123"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  api:
+    build:
+      context: ./backend/Pecenje.Api
+      dockerfile: Dockerfile
+    container_name: pecenje-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=PecenjeEnterprise;User Id=sa;Password=Your_strong_Password123;TrustServerCertificate=True"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - sqlserver
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pecenje-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  sqlserver_data:

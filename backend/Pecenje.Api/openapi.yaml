@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: Pecenje Enterprise API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Најава
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Успешна најава
+  /dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: Контролна табла
+      responses:
+        "200":
+          description: KPI преглед
+  /baking-plans:
+    get:
+      tags: [Planning]
+      summary: Листа на планови
+      responses:
+        "200":
+          description: Планови
+  /batches:
+    get:
+      tags: [Production]
+      summary: Листа на batch записи
+      responses:
+        "200":
+          description: Batch записи
+  /waste:
+    get:
+      tags: [Waste]
+      summary: Листа на отпад
+      responses:
+        "200":
+          description: Отпад записи
+  /master-data/locations:
+    get:
+      tags: [MasterData]
+      summary: Листа на локации
+      responses:
+        "200":
+          description: Локации
+    post:
+      tags: [MasterData]
+      summary: Креирање локација
+      responses:
+        "201":
+          description: Локација креирана
+  /master-data/items:
+    get:
+      tags: [MasterData]
+      summary: Листа на артикли
+      responses:
+        "200":
+          description: Артикли
+    post:
+      tags: [MasterData]
+      summary: Креирање артикал
+      responses:
+        "201":
+          description: Артикал креиран
+  /master-data/locations/{locationId}:
+    put:
+      tags: [MasterData]
+      summary: Измена локација
+      responses:
+        "200":
+          description: Локација изменета
+  /master-data/items/{itemId}:
+    put:
+      tags: [MasterData]
+      summary: Измена артикал
+      responses:
+        "200":
+          description: Артикал изменет
+  /alerts:
+    get:
+      tags: [Alerts]
+      summary: Листа на аларми
+      responses:
+        "200":
+          description: Аларми
+  /integrations/master-data/sync:
+    post:
+      tags: [Integrations]
+      summary: Daily sync за локации и артикли од source DB
+      responses:
+        "200":
+          description: Sync result
+  /users:
+    get:
+      tags: [Users]
+      summary: Листа на корисници
+      responses:
+        "200":
+          description: Корисници
+  /users/{userId}/locations:
+    get:
+      tags: [Users]
+      summary: Локациски привилегии за корисник
+      responses:
+        "200":
+          description: Привилегии
+    put:
+      tags: [Users]
+      summary: Измена на локациски привилегии за корисник
+      responses:
+        "200":
+          description: Привилегии ажурирани
+  /reports/plan-vs-actual:
+    get:
+      tags: [Reports]
+      summary: Извештај план vs реализација
+      responses:
+        "200":
+          description: Report rows
