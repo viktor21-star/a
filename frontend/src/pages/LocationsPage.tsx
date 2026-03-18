@@ -38,6 +38,7 @@ export function LocationsPage() {
         <div>
           <p className="topbar-eyebrow">Шифарници</p>
           <h3>Локации</h3>
+          <p className="meta">Тука се дефинира секој маркет што влегува во планот, алармите, извештаите и корисничките дозволи.</p>
         </div>
       </header>
 

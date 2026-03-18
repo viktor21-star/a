@@ -11,6 +11,10 @@ export async function startNativeUpdate(url: string, fileName = "app-debug.apk")
     throw new Error("Native update is available only on Android.");
   }
 
+  if (!Capacitor.isPluginAvailable("AppUpdater")) {
+    throw new Error("AppUpdater plugin is not implemented on Android for this APK build.");
+  }
+
   return AppUpdater.startUpdate({ url, fileName });
 }
 

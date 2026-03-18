@@ -16,16 +16,16 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
     {
         [1] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", true, true, true, true, true, true, true),
-            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true)
+            new UserLocationPermissionDto(1, "Аеродром 1", true, true, true, true, true, true, true, "Ротациона"),
+            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, "Камена")
         ],
         [2] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", false, true, true, false, false, true, false)
+            new UserLocationPermissionDto(1, "Аеродром 1", false, true, true, false, false, true, false, "Ротациона")
         ],
         [3] =
         [
-            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true)
+            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, "Комбинирана")
         ]
     };
 
@@ -42,8 +42,8 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
         Users.Add(user);
         PermissionsByUser[nextId] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", false, false, false, false, false, false, false),
-            new UserLocationPermissionDto(2, "Центар", false, false, false, false, false, false, false)
+            new UserLocationPermissionDto(1, "Аеродром 1", false, false, false, false, false, false, false, "Нема"),
+            new UserLocationPermissionDto(2, "Центар", false, false, false, false, false, false, false, "Нема")
         ];
 
         return Task.FromResult(user);

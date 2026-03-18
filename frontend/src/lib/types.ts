@@ -149,6 +149,23 @@ export type UserSummary = {
   isActive: boolean;
 };
 
+export type LoginRequest = {
+  username: string;
+  password: string;
+};
+
+export type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: number;
+    fullName: string;
+    role: string;
+    defaultLocationId?: number | null;
+    permissions: string[];
+  };
+};
+
 export type CreateUserRequest = {
   username: string;
   fullName: string;
@@ -166,4 +183,5 @@ export type UserLocationPermission = {
   canApprovePlan: boolean;
   canUsePekara: boolean;
   canUsePecenjara: boolean;
+  ovenType?: string | null;
 };

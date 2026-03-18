@@ -1,32 +1,14 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { api } from "./api";
+import type { ApiEnvelope, LoginRequest, LoginResponse } from "./types";
 
 export type AuthUser = {
   id: number;
   fullName: string;
   role: string;
   defaultLocationId?: number | null;
+  permissions?: string[];
 };
-
-export const DEMO_USERS: AuthUser[] = [
-  {
-    id: 1,
-    fullName: "Администратор",
-    role: "administrator",
-    defaultLocationId: 1
-  },
-  {
-    id: 2,
-    fullName: "Оператор Аеродром 1",
-    role: "operator",
-    defaultLocationId: 1
-  },
-  {
-    id: 3,
-    fullName: "Шеф Центар",
-    role: "manager",
-    defaultLocationId: 2
-  }
-];
 
 export function isAdministrator(user: AuthUser | null) {
   return user?.role === "administrator";
@@ -35,7 +17,7 @@ export function isAdministrator(user: AuthUser | null) {
 type AuthState = {
   user: AuthUser | null;
   accessToken: string | null;
-  loginDemo: (userId?: number) => void;
+  login: (credentials: LoginRequest) => Promise<void>;
   logout: () => void;
 };
 
@@ -60,14 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loginDemo = (userId = 1) => {
-    const nextUser = DEMO_USERS.find((candidate) => candidate.id === userId) ?? DEMO_USERS[0];
+  const login = async (credentials: LoginRequest) => {
+    const response = await api.login<ApiEnvelope<LoginResponse>>(credentials);
+    const nextUser: AuthUser = {
+      id: response.data.user.id,
+      fullName: response.data.user.fullName,
+      role: response.data.user.role,
+      defaultLocationId: response.data.user.defaultLocationId,
+      permissions: response.data.user.permissions
+    };
 
     setUser(nextUser);
-    setAccessToken("demo-token");
+    setAccessToken(response.data.accessToken);
     window.localStorage.setItem(
       "pecenje-auth",
-      JSON.stringify({ user: nextUser, accessToken: "demo-token" })
+      JSON.stringify({ user: nextUser, accessToken: response.data.accessToken })
     );
   };
 
@@ -78,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, loginDemo, logout }}>
+    <AuthContext.Provider value={{ user, accessToken, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

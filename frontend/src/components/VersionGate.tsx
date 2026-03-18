@@ -31,6 +31,9 @@ export function VersionGate({ children }: PropsWithChildren) {
     startNativeUpdate(policy.downloadUrl)
       .catch((error: Error) => {
         setUpdateError(error.message);
+        if (shouldFallbackToBrowserDownload(error)) {
+          window.location.href = policy.downloadUrl;
+        }
       })
       .finally(() => {
         setStartingUpdate(false);
@@ -101,6 +104,9 @@ export function VersionGate({ children }: PropsWithChildren) {
                   startNativeUpdate(policy.downloadUrl)
                     .catch((error: Error) => {
                       setUpdateError(error.message);
+                      if (shouldFallbackToBrowserDownload(error)) {
+                        window.location.href = policy.downloadUrl;
+                      }
                     })
                     .finally(() => {
                       setStartingUpdate(false);
@@ -121,4 +127,9 @@ export function VersionGate({ children }: PropsWithChildren) {
   }
 
   return <>{children}</>;
+}
+
+function shouldFallbackToBrowserDownload(error: Error) {
+  const message = error.message.toLowerCase();
+  return message.includes("plugin is not implemented") || message.includes("not implemented");
 }

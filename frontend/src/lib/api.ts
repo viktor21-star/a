@@ -56,6 +56,7 @@ async function send<T>(path: string, method: "POST" | "PUT", body: unknown): Pro
 }
 
 export const api = {
+  login: <T>(body: unknown) => send<T>("/auth/login", "POST", body),
   getDashboardOverview: <T>() => request<T>("/dashboard/overview"),
   getVersionPolicy: <T>() => request<T>("/version-policy"),
   updateVersionPolicy: <T>(body: unknown) => send<T>("/version-policy", "PUT", body),

@@ -61,7 +61,8 @@ public static class UserAccessSql
             ul.CanViewReports,
             ul.CanApprovePlan,
             ul.CanUsePekara,
-            ul.CanUsePecenjara
+            ul.CanUsePecenjara,
+            CAST(NULL AS NVARCHAR(64)) AS OvenType
         FROM dbo.UserLocations ul
         INNER JOIN dbo.Locations l ON l.LocationId = ul.LocationId
         WHERE ul.UserId = @UserId

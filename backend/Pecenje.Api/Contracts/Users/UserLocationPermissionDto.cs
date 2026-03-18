@@ -9,5 +9,6 @@ public sealed record UserLocationPermissionDto(
     bool CanViewReports,
     bool CanApprovePlan,
     bool CanUsePekara,
-    bool CanUsePecenjara
+    bool CanUsePecenjara,
+    string? OvenType = null
 );

@@ -337,6 +337,16 @@ button {
   color: var(--primary-strong);
 }
 
+.severity--high {
+  background: rgba(197, 82, 82, 0.18);
+  color: var(--danger);
+}
+
+.severity--medium {
+  background: rgba(197, 139, 44, 0.15);
+  color: var(--warning);
+}
+
 .report-table {
   display: grid;
   gap: 10px;
@@ -401,6 +411,69 @@ button {
   color: var(--muted);
 }
 
+.admin-hero-grid,
+.admin-form-grid,
+.admin-summary-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-hero-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.admin-form-grid,
+.admin-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.admin-stat-tile,
+.admin-input-tile,
+.admin-tile-card,
+.user-summary-card {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(237, 244, 239, 0.96) 100%);
+  box-shadow: var(--shadow);
+}
+
+.admin-stat-tile,
+.admin-input-tile {
+  padding: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-stat-tile span,
+.admin-input-tile span,
+.permission-select span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.admin-stat-tile strong {
+  font-size: 2rem;
+}
+
+.admin-input-tile select,
+.admin-input-tile input,
+.permission-select select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.admin-input-tile--action {
+  align-content: end;
+}
+
+.admin-tile-card {
+  min-height: 180px;
+}
+
 .user-list-button {
   width: 100%;
   justify-content: flex-start;
@@ -420,10 +493,27 @@ button {
   margin-top: 12px;
 }
 
+.permission-card--large {
+  margin-top: 0;
+  padding: 20px;
+  gap: 14px;
+}
+
 .permission-card label {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.permission-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.permission-select {
+  display: grid;
+  gap: 8px;
 }
 
 .mode-grid {
@@ -507,6 +597,22 @@ button {
   grid-template-columns: 1.4fr 1.6fr 1fr 100px;
 }
 
+.user-summary-card {
+  width: 100%;
+  text-align: left;
+  padding: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.user-summary-card--active {
+  background: linear-gradient(135deg, var(--primary) 0%, #2e7158 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
@@ -548,7 +654,11 @@ button {
 
   .operator-mode-grid,
   .mode-grid,
-  .mode-grid--wide {
+  .mode-grid--wide,
+  .admin-form-grid,
+  .admin-summary-grid,
+  .admin-hero-grid,
+  .permission-check-grid {
     grid-template-columns: 1fr;
   }
 

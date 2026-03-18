@@ -1,7 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { RequireAuth } from "./components/RequireAuth";
-import { DashboardPage } from "./pages/DashboardPage";
 import { PlanningPage } from "./pages/PlanningPage";
 import { ProductionPage } from "./pages/ProductionPage";
 import { ReportsPage } from "./pages/ReportsPage";

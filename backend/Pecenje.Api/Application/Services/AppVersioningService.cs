@@ -5,7 +5,7 @@ using Pecenje.Api.Services;
 
 namespace Pecenje.Api.Application.Services;
 
-public sealed class AppVersioningService(IOptions<AppVersioningOptions> options, IAuditService auditService)
+public sealed class AppVersioningService(IOptions<AppVersioningOptions> options, IServiceScopeFactory serviceScopeFactory)
 {
     private readonly object syncRoot = new();
     private AppVersionPolicyDto current = new(
@@ -43,6 +43,8 @@ public sealed class AppVersioningService(IOptions<AppVersioningOptions> options,
             current = next;
         }
 
+        using var scope = serviceScopeFactory.CreateScope();
+        var auditService = scope.ServiceProvider.GetRequiredService<IAuditService>();
         await auditService.LogAsync("AppVersionPolicy", "update", "singleton", request, cancellationToken);
         return next;
     }

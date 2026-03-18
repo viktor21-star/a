@@ -10,8 +10,21 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/api/v1/auth").WithTags("Auth");
 
-        group.MapPost("/login", (LoginRequest request, IAuthService authService) => Results.Ok(
-            new ApiEnvelope<LoginResponse>(authService.Login(request))));
+        group.MapPost("/login", (LoginRequest request, IAuthService authService) =>
+        {
+            try
+            {
+                return Results.Ok(new ApiEnvelope<LoginResponse>(authService.Login(request)));
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                return Results.Json(
+                    new ApiEnvelope<object>(
+                        null,
+                        Errors: [new ApiError("AUTH_INVALID", exception.Message)]),
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
+        });
 
         group.MapPost("/refresh", () => Results.Ok(
             new ApiEnvelope<object>(new

@@ -1,15 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
 import { useExportPlanVsActualExcel, useExportPlanVsActualPdf, usePlanVsActualReport } from "../lib/queries";
 
 const reports = [
+  "Извештај за испечено",
   "Дневен план vs реализација",
   "Печење vs продажба",
   "Отпад по артикал",
-  "Отпад по локација",
-  "KPI по локација",
-  "Финансиска анализа"
+  "Отпад по локација"
 ];
 
 export function ReportsPage() {
@@ -38,6 +37,16 @@ export function ReportsPage() {
     }
   }, [exportPdf.data]);
 
+  const bakedSummary = useMemo(() => {
+    if (!data?.data) {
+      return [];
+    }
+
+    return [...data.data.rows]
+      .sort((left, right) => right.bakedQty - left.bakedQty)
+      .slice(0, 4);
+  }, [data]);
+
   if (!isAdministrator(user)) {
     return <PageState message="Извештаите се достапни само за администратор." />;
   }
@@ -55,15 +64,31 @@ export function ReportsPage() {
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Аналитика</p>
-          <h3>Извештаи и export центар</h3>
+          <h3>Извештаи за испечено и реализација</h3>
+          <p className="meta">Администраторот тука вади извештај што е испечено, што е планирано и колкава е разликата.</p>
         </div>
       </header>
 
+      <section className="admin-hero-grid">
+        <article className="admin-stat-tile">
+          <span>Вкупно испечено</span>
+          <strong>{data.data.totals.bakedQty}</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Вкупно планирано</span>
+          <strong>{data.data.totals.plannedQty}</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Реализација</span>
+          <strong>{data.data.totals.realizationPct}%</strong>
+        </article>
+      </section>
+
       <div className="card-list reports-grid">
         {reports.map((report) => (
-          <article className="workflow-card" key={report}>
+          <article className="workflow-card admin-tile-card" key={report}>
             <h4>{report}</h4>
-            <p>Excel и PDF извоз со филтри по датум, локација и артикал.</p>
+            <p>Excel и PDF извоз со фокус на испечено, разлики и реализација по маркет и артикал.</p>
             <div className="workflow-card__actions">
               <button
                 className="ghost-button"
@@ -94,8 +119,23 @@ export function ReportsPage() {
 
       <section className="panel">
         <div className="panel-header">
+          <h3>Најмногу испечено</h3>
+        </div>
+        <div className="card-list admin-summary-grid">
+          {bakedSummary.map((row) => (
+            <article className="workflow-card admin-tile-card" key={`${row.locationName}-${row.itemName}`}>
+              <h4>{row.itemName}</h4>
+              <p>Маркет: {row.locationName}</p>
+              <p>Испечено: {row.bakedQty}</p>
+              <p>План: {row.plannedQty}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
           <h3>Преглед: План vs реализација</h3>
-          <span>реален API shape</span>
         </div>
         <div className="report-table">
           {data.data.rows.map((row) => (

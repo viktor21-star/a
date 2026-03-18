@@ -8,9 +8,9 @@ const administratorNavItems = [
   { to: "/production", label: "Реално печење" },
   { to: "/alerts", label: "Аларми" },
   { to: "/reports", label: "Извештаи" },
+  { to: "/master-data/locations", label: "Локации" },
   { to: "/master-data", label: "Шифарници" },
   { to: "/user-access", label: "Корисници" },
-  { to: "/integrations", label: "Интеграции" },
   { to: "/version-policy", label: "Верзија" }
 ];
 
