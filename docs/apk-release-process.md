@@ -3,11 +3,13 @@
 За нова верзија без Play Store:
 
 1. изгради нов `APK`
-2. стави го во:
-   - [backend/Pecenje.Api/wwwroot/downloads/README.txt](/home/zitomarketi/Desktop/Pecenje%20app/backend/Pecenje.Api/wwwroot/downloads/README.txt)
-   - реалниот фајл треба да биде `backend/Pecenje.Api/wwwroot/downloads/app-debug.apk`
-3. ажурирај ја version policy во:
-   - [backend/Pecenje.Api/appsettings.json](/home/zitomarketi/Desktop/Pecenje%20app/backend/Pecenje.Api/appsettings.json)
+2. пушти ја helper скриптата:
+   - `bash "/home/zitomarketi/Desktop/Pecenje app/scripts/publish_latest_apk.sh"`
+   - за задолжителен update: `bash "/home/zitomarketi/Desktop/Pecenje app/scripts/publish_latest_apk.sh" true`
+3. скриптата автоматски:
+   - го наоѓа најновиот `app-debug.apk` или последниот zip artifact во `~/Downloads`
+   - го копира во `backend/Pecenje.Api/wwwroot/downloads/app-debug.apk`
+   - ги ажурира `LatestVersion`, `BuildNumber`, `ReleasedAt` и `ForceUpdate` во [backend/Pecenje.Api/appsettings.json](/home/zitomarketi/Desktop/Pecenje%20app/backend/Pecenje.Api/appsettings.json)
 
 ## Што се менува во config
 
