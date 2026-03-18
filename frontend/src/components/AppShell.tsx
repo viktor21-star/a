@@ -1,21 +1,26 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../lib/theme";
-import { useAuth } from "../lib/auth";
+import { isAdministrator, useAuth } from "../lib/auth";
+import { APP_BUILD, APP_BUILD_DATE, APP_VERSION } from "../lib/version";
 
-const navItems = [
-  { to: "/", label: "Контролна табла" },
+const administratorNavItems = [
   { to: "/planning", label: "План на печење" },
   { to: "/production", label: "Реално печење" },
   { to: "/alerts", label: "Аларми" },
   { to: "/reports", label: "Извештаи" },
   { to: "/master-data", label: "Шифарници" },
   { to: "/user-access", label: "Корисници" },
-  { to: "/integrations", label: "Интеграции" }
+  { to: "/integrations", label: "Интеграции" },
+  { to: "/version-policy", label: "Верзија" }
 ];
+
+const operatorNavItems = [{ to: "/production", label: "Внес на печење" }];
 
 export function AppShell() {
   const { mode, toggle } = useTheme();
   const { user, logout } = useAuth();
+  const adminMode = isAdministrator(user);
+  const navItems = adminMode ? administratorNavItems : operatorNavItems;
 
   return (
     <div className="shell">
@@ -45,13 +50,14 @@ export function AppShell() {
         <header className="topbar">
           <div>
             <p className="topbar-eyebrow">Малопродажен синџир</p>
-            <h2>Оперативен надзор и KPI</h2>
+            <h2>{adminMode ? "Оперативен надзор и KPI" : "Операторски внес на печење"}</h2>
           </div>
 
           <div className="topbar-actions">
             <div className="user-chip">
               <strong>{user?.fullName ?? "Гостин"}</strong>
               <span>{user?.role ?? "unauthenticated"}</span>
+              <span>v{APP_VERSION} · build {APP_BUILD} · {APP_BUILD_DATE}</span>
             </div>
             <button className="theme-toggle" type="button" onClick={toggle}>
               {mode === "light" ? "Dark mode" : "Light mode"}

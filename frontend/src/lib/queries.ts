@@ -3,12 +3,16 @@ import { api } from "./api";
 import type {
   Alert,
   ApiEnvelope,
+  AppVersionPolicy,
+  UpdateAppVersionPolicyRequest,
   BatchDetail,
+  CreateUserRequest,
   DashboardOverview,
   Item,
   Location,
   PlanCard,
   PlanVsActualReport,
+  ReportExport,
   UpsertItemRequest,
   UpsertLocationRequest,
   UserLocationPermission,
@@ -20,6 +24,24 @@ export function useDashboardOverview() {
   return useQuery({
     queryKey: ["dashboard-overview"],
     queryFn: () => api.getDashboardOverview<ApiEnvelope<DashboardOverview>>()
+  });
+}
+
+export function useVersionPolicy() {
+  return useQuery({
+    queryKey: ["version-policy"],
+    queryFn: () => api.getVersionPolicy<ApiEnvelope<AppVersionPolicy>>()
+  });
+}
+
+export function useUpdateVersionPolicy() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateAppVersionPolicyRequest) => api.updateVersionPolicy<ApiEnvelope<AppVersionPolicy>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["version-policy"] });
+    }
   });
 }
 
@@ -58,6 +80,18 @@ export function usePlanVsActualReport() {
   });
 }
 
+export function useExportPlanVsActualExcel() {
+  return useMutation({
+    mutationFn: () => api.exportPlanVsActualExcel<ApiEnvelope<ReportExport>>()
+  });
+}
+
+export function useExportPlanVsActualPdf() {
+  return useMutation({
+    mutationFn: () => api.exportPlanVsActualPdf<ApiEnvelope<ReportExport>>()
+  });
+}
+
 export function useLocations() {
   return useQuery({
     queryKey: ["locations"],
@@ -84,6 +118,17 @@ export function useUserLocations(userId: number | null) {
     queryKey: ["user-locations", userId],
     queryFn: () => api.getUserLocations<ApiEnvelope<UserLocationPermission[]>>(userId as number),
     enabled: Boolean(userId)
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateUserRequest) => api.createUser<ApiEnvelope<UserSummary>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    }
   });
 }
 

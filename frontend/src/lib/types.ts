@@ -89,6 +89,24 @@ export type PlanVsActualReport = {
   };
 };
 
+export type ReportExport = {
+  fileName: string;
+  contentType: string;
+  contentBase64: string;
+};
+
+export type AppVersionPolicy = {
+  minimumSupportedVersion: string;
+  latestVersion: string;
+  buildNumber: string;
+  releasedAt: string;
+  forceUpdate: boolean;
+  downloadUrl: string;
+  messageMk: string;
+};
+
+export type UpdateAppVersionPolicyRequest = AppVersionPolicy;
+
 export type Location = {
   locationId: number;
   code: string;
@@ -125,6 +143,13 @@ export type UpsertItemRequest = {
 
 export type UserSummary = {
   userId: number;
+  username: string;
+  fullName: string;
+  roleCode: string;
+  isActive: boolean;
+};
+
+export type CreateUserRequest = {
   username: string;
   fullName: string;
   roleCode: string;

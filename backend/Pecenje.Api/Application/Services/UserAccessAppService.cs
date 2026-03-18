@@ -9,6 +9,13 @@ public sealed class UserAccessAppService(IUserAccessRepository repository, IAudi
     public Task<IReadOnlyList<UserSummaryDto>> GetUsersAsync(CancellationToken cancellationToken = default)
         => repository.GetUsersAsync(cancellationToken);
 
+    public async Task<UserSummaryDto> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await repository.CreateUserAsync(request, cancellationToken);
+        await auditService.LogAsync("Users", "create", result.UserId.ToString(), request, cancellationToken);
+        return result;
+    }
+
     public Task<IReadOnlyList<UserLocationPermissionDto>> GetUserLocationsAsync(long userId, CancellationToken cancellationToken = default)
         => repository.GetUserLocationsAsync(userId, cancellationToken);
 

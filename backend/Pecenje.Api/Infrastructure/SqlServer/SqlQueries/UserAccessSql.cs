@@ -14,6 +14,43 @@ public static class UserAccessSql
         ORDER BY u.FullName;
         """;
 
+    public const string CreateUser = """
+        DECLARE @RoleId INT;
+        SELECT @RoleId = RoleId
+        FROM dbo.Roles
+        WHERE Code = @RoleCode;
+
+        IF @RoleId IS NULL
+        BEGIN
+            THROW 51000, 'Role not found.', 1;
+        END;
+
+        INSERT INTO dbo.Users (
+            Username,
+            FullName,
+            PasswordHash,
+            RoleId,
+            IsActive
+        )
+        VALUES (
+            @Username,
+            @FullName,
+            @PasswordHash,
+            @RoleId,
+            @IsActive
+        );
+
+        SELECT
+            u.UserId,
+            u.Username,
+            u.FullName,
+            r.Code AS RoleCode,
+            u.IsActive
+        FROM dbo.Users u
+        INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
+        WHERE u.UserId = CAST(SCOPE_IDENTITY() AS BIGINT);
+        """;
+
     public const string GetUserLocations = """
         SELECT
             ul.LocationId,

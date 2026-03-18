@@ -1,10 +1,16 @@
 import { KpiCard } from "../components/KpiCard";
 import { PageState } from "../components/PageState";
+import { isAdministrator, useAuth } from "../lib/auth";
 import { useAlerts, useDashboardOverview } from "../lib/queries";
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const overviewQuery = useDashboardOverview();
   const alertsQuery = useAlerts();
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Контролната табла е достапна само за администратор." />;
+  }
 
   if (overviewQuery.isLoading) {
     return <PageState message="Се вчитува dashboard..." />;

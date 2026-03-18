@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { MasterDataForm } from "../components/MasterDataForm";
+import { isAdministrator, useAuth } from "../lib/auth";
 import { useItems } from "../lib/queries";
 import { useCreateItem, useUpdateItem } from "../lib/queries";
 import { PageState } from "../components/PageState";
 import type { UpsertItemRequest } from "../lib/types";
 
 export function ItemsPage() {
+  const { user } = useAuth();
   const { data, isLoading, isError } = useItems();
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
@@ -19,6 +21,10 @@ export function ItemsPage() {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const formError = (createItem.error || updateItem.error) as Error | null;
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Артиклите ги одржува администратор." />;
+  }
 
   if (isLoading) {
     return <PageState message="Се вчитуваат артикли..." />;

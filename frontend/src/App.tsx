@@ -12,6 +12,8 @@ import { LocationsPage } from "./pages/LocationsPage";
 import { ItemsPage } from "./pages/ItemsPage";
 import { UserAccessPage } from "./pages/UserAccessPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
+import { HomePage } from "./pages/HomePage";
+import { VersionPolicyPage } from "./pages/VersionPolicyPage";
 
 export function App() {
   return (
@@ -25,7 +27,7 @@ export function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route index element={<HomePage />} />
         <Route path="planning" element={<PlanningPage />} />
         <Route path="production" element={<ProductionPage />} />
         <Route path="alerts" element={<AlertsPage />} />
@@ -35,6 +37,7 @@ export function App() {
         <Route path="master-data/items" element={<ItemsPage />} />
         <Route path="user-access" element={<UserAccessPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="version-policy" element={<VersionPolicyPage />} />
       </Route>
     </Routes>
   );

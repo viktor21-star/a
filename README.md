@@ -28,6 +28,10 @@
 - android apk install: [docs/android-apk-install.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/android-apk-install.md)
 - github actions apk: [docs/github-actions-apk.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/github-actions-apk.md)
 - android release signing: [docs/android-release-signing.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/android-release-signing.md)
+- report export: [docs/report-export.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/report-export.md)
+- force update without play: [docs/force-update-without-play.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/force-update-without-play.md)
+- apk release process: [docs/apk-release-process.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/apk-release-process.md)
+- native android updater: [docs/native-android-updater.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/native-android-updater.md)
 
 ## Production skeleton
 

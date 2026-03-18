@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { PageState } from "../components/PageState";
+import { isAdministrator, useAuth } from "../lib/auth";
 
 const masterSections = [
   { title: "Локации", description: "Управување со маркет објекти и региони.", path: "/master-data/locations" },
@@ -10,6 +12,12 @@ const masterSections = [
 ];
 
 export function MasterDataPage() {
+  const { user } = useAuth();
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Шифарниците ги одржува администратор." />;
+  }
+
   return (
     <section className="page-grid">
       <header className="page-header">

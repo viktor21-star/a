@@ -12,6 +12,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.Configure<SourceDatabaseOptions>(builder.Configuration.GetSection(SourceDatabaseOptions.SectionName));
 builder.Services.Configure<MasterDataSyncOptions>(builder.Configuration.GetSection(MasterDataSyncOptions.SectionName));
+builder.Services.Configure<AppVersioningOptions>(builder.Configuration.GetSection(AppVersioningOptions.SectionName));
 builder.Services.AddApplicationServices();
 builder.Services.AddHostedService<MasterDataSyncBackgroundService>();
 builder.Services.AddCors(options =>
@@ -29,6 +30,7 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors("frontend");
 
 if (app.Environment.IsDevelopment())
@@ -54,5 +56,6 @@ app.MapReportEndpoints();
 app.MapMasterDataEndpoints();
 app.MapIntegrationEndpoints();
 app.MapUserAccessEndpoints();
+app.MapVersionEndpoints();
 
 app.Run();

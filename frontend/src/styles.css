@@ -42,6 +42,10 @@ body {
   transition: background 180ms ease, color 180ms ease;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 button {
   font: inherit;
 }
@@ -125,6 +129,7 @@ button {
   padding: 24px;
   display: grid;
   gap: 20px;
+  min-width: 0;
 }
 
 .topbar,
@@ -291,6 +296,10 @@ button {
   color: var(--muted);
 }
 
+.update-card {
+  width: min(100%, 620px);
+}
+
 .action-button,
 .theme-toggle {
   background: linear-gradient(135deg, var(--primary) 0%, #2e7158 100%);
@@ -353,7 +362,8 @@ button {
   gap: 12px;
 }
 
-.master-form input {
+.master-form input,
+.master-form select {
   width: 100%;
   border: 1px solid var(--line);
   background: var(--surface);
@@ -362,9 +372,25 @@ button {
   padding: 12px 14px;
 }
 
+.master-form--inline {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.master-form--operator {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .form-error {
   color: var(--danger);
   font-weight: 700;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
 }
 
 .reports-grid {
@@ -439,9 +465,77 @@ button {
   background: var(--surface-strong);
 }
 
+.operator-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.operator-mode-card {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(237, 244, 239, 0.95) 100%);
+  color: var(--text);
+  padding: 32px 24px;
+  min-height: 180px;
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+
+.operator-mode-card strong {
+  font-size: 1.6rem;
+}
+
+.operator-mode-card span {
+  color: var(--muted);
+}
+
+.operator-mode-card--active {
+  background: linear-gradient(135deg, var(--primary) 0%, #2e7158 100%);
+  color: #fff;
+  border-color: transparent;
+}
+
+.operator-mode-card--active span {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.report-row--manual-plan {
+  grid-template-columns: 1.4fr 1.6fr 1fr 100px;
+}
+
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    padding: 18px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .topbar,
+  .page-header,
+  .panel-header,
+  .workflow-card__top,
+  .workflow-card__actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .nav {
+    grid-template-columns: 1fr 1fr;
   }
 
   .panel-grid {
@@ -450,5 +544,35 @@ button {
 
   .report-row {
     grid-template-columns: 1fr;
+  }
+
+  .operator-mode-grid,
+  .mode-grid,
+  .mode-grid--wide {
+    grid-template-columns: 1fr;
+  }
+
+  .master-form--inline,
+  .master-form--operator {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav {
+    grid-template-columns: 1fr;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .user-chip {
+    width: 100%;
+  }
+
+  .operator-mode-card {
+    min-height: 140px;
+    padding: 24px 18px;
   }
 }

@@ -17,6 +17,24 @@ public sealed class SqlServerUserAccessRepository(IAppSqlConnectionFactory conne
         return rows.AsList();
     }
 
+    public async Task<UserSummaryDto> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        var created = await connection.QuerySingleAsync<UserSummaryDto>(new CommandDefinition(
+            UserAccessSql.CreateUser,
+            new
+            {
+                request.Username,
+                request.FullName,
+                request.RoleCode,
+                request.IsActive,
+                PasswordHash = "DEMO-PASSWORD-HASH"
+            },
+            cancellationToken: cancellationToken));
+
+        return created;
+    }
+
     public async Task<IReadOnlyList<UserLocationPermissionDto>> GetUserLocationsAsync(long userId, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();

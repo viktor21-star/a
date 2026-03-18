@@ -1,8 +1,14 @@
 import { useAlerts } from "../lib/queries";
 import { PageState } from "../components/PageState";
+import { isAdministrator, useAuth } from "../lib/auth";
 
 export function AlertsPage() {
+  const { user } = useAuth();
   const { data, isLoading, isError } = useAlerts();
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Алармите ги следи администратор." />;
+  }
 
   if (isLoading) {
     return <PageState message="Се вчитуваат аларми..." />;

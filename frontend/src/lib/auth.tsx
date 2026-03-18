@@ -28,6 +28,10 @@ export const DEMO_USERS: AuthUser[] = [
   }
 ];
 
+export function isAdministrator(user: AuthUser | null) {
+  return user?.role === "administrator";
+}
+
 type AuthState = {
   user: AuthUser | null;
   accessToken: string | null;

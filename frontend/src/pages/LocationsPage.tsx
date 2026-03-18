@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { MasterDataForm } from "../components/MasterDataForm";
+import { isAdministrator, useAuth } from "../lib/auth";
 import { useLocations } from "../lib/queries";
 import { useCreateLocation, useUpdateLocation } from "../lib/queries";
 import { PageState } from "../components/PageState";
 import type { UpsertLocationRequest } from "../lib/types";
 
 export function LocationsPage() {
+  const { user } = useAuth();
   const { data, isLoading, isError } = useLocations();
   const createLocation = useCreateLocation();
   const updateLocation = useUpdateLocation();
@@ -17,6 +19,10 @@ export function LocationsPage() {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const formError = (createLocation.error || updateLocation.error) as Error | null;
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Локациите ги одржува администратор." />;
+  }
 
   if (isLoading) {
     return <PageState message="Се вчитуваат локации..." />;

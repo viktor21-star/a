@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AdminAccessAppService>();
         services.AddScoped<LocationAccessAppService>();
         services.AddScoped<UserAccessAppService>();
+        services.AddSingleton<AppVersioningService>();
         return services;
     }
 }

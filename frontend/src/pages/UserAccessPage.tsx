@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { PageState } from "../components/PageState";
-import { useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
-import type { UserLocationPermission } from "../lib/types";
+import { isAdministrator, useAuth } from "../lib/auth";
+import { useCreateUser, useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
+import type { CreateUserRequest, UserLocationPermission } from "../lib/types";
 
 type PermissionField =
   | "canPlan"
@@ -13,11 +14,19 @@ type PermissionField =
   | "canUsePecenjara";
 
 export function UserAccessPage() {
+  const { user } = useAuth();
   const usersQuery = useUsers();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const locationsQuery = useUserLocations(selectedUserId);
   const updateMutation = useUpdateUserLocations();
+  const createUserMutation = useCreateUser();
   const [draft, setDraft] = useState<UserLocationPermission[]>([]);
+  const [newUser, setNewUser] = useState<CreateUserRequest>({
+    username: "",
+    fullName: "",
+    roleCode: "operator",
+    isActive: true
+  });
 
   useEffect(() => {
     if (!selectedUserId && usersQuery.data?.data.length) {
@@ -30,6 +39,10 @@ export function UserAccessPage() {
       setDraft(locationsQuery.data.data);
     }
   }, [locationsQuery.data]);
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Само администратор може да креира корисници и да менува привилегии." />;
+  }
 
   if (usersQuery.isLoading) {
     return <PageState message="Се вчитуваат корисници..." />;
@@ -47,6 +60,54 @@ export function UserAccessPage() {
           <h3>Корисници и привилегии по локација</h3>
         </div>
       </header>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Креирај корисник</h3>
+        </div>
+        <div className="master-form master-form--inline">
+          <input
+            value={newUser.fullName}
+            placeholder="Име и презиме"
+            onChange={(event) => setNewUser((current) => ({ ...current, fullName: event.target.value }))}
+          />
+          <input
+            value={newUser.username}
+            placeholder="Корисничко име"
+            onChange={(event) => setNewUser((current) => ({ ...current, username: event.target.value }))}
+          />
+          <select
+            value={newUser.roleCode}
+            onChange={(event) => setNewUser((current) => ({ ...current, roleCode: event.target.value }))}
+          >
+            <option value="operator">Оператор</option>
+            <option value="administrator">Администратор</option>
+          </select>
+          <button
+            className="action-button"
+            type="button"
+            onClick={() => {
+              if (!newUser.username || !newUser.fullName) {
+                return;
+              }
+
+              createUserMutation.mutate(newUser, {
+                onSuccess: (response) => {
+                  setSelectedUserId(response.data.userId);
+                  setNewUser({
+                    username: "",
+                    fullName: "",
+                    roleCode: "operator",
+                    isActive: true
+                  });
+                }
+              });
+            }}
+          >
+            Креирај корисник
+          </button>
+        </div>
+      </section>
 
       <div className="panel-grid panel-grid--production">
         <aside className="panel">

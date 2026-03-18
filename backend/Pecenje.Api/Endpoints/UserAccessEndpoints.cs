@@ -13,6 +13,9 @@ public static class UserAccessEndpoints
         group.MapGet("/", async (UserAccessAppService appService, CancellationToken cancellationToken) =>
             Results.Ok(new ApiEnvelope<IReadOnlyList<UserSummaryDto>>(await appService.GetUsersAsync(cancellationToken))));
 
+        group.MapPost("/", async (CreateUserRequest request, UserAccessAppService appService, CancellationToken cancellationToken) =>
+            Results.Ok(new ApiEnvelope<UserSummaryDto>(await appService.CreateUserAsync(request, cancellationToken))));
+
         group.MapGet("/{userId:long}/locations", async (long userId, UserAccessAppService appService, CancellationToken cancellationToken) =>
             Results.Ok(new ApiEnvelope<IReadOnlyList<UserLocationPermissionDto>>(await appService.GetUserLocationsAsync(userId, cancellationToken))));
 

@@ -1,9 +1,16 @@
 import { useState } from "react";
+import { PageState } from "../components/PageState";
+import { isAdministrator, useAuth } from "../lib/auth";
 import { useManualMasterDataSync } from "../lib/queries";
 
 export function IntegrationsPage() {
+  const { user } = useAuth();
   const syncMutation = useManualMasterDataSync();
   const [lastResult, setLastResult] = useState<{ locationsSynced: number; itemsSynced: number; mode: string } | null>(null);
+
+  if (!isAdministrator(user)) {
+    return <PageState message="Интеграциите ги контролира администратор." />;
+  }
 
   return (
     <section className="page-grid">
