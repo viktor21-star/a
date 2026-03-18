@@ -1,63 +1,66 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { APP_BUILD, APP_BUILD_DATE, APP_VERSION } from "../lib/version";
-
-const administratorNavItems = [
-  { to: "/planning", label: "План на печење" },
-  { to: "/production", label: "Реално печење" },
-  { to: "/alerts", label: "Аларми" },
-  { to: "/reports", label: "Извештаи" },
-  { to: "/master-data/locations", label: "Локации" },
-  { to: "/master-data", label: "Шифарници" },
-  { to: "/user-access", label: "Корисници" },
-  { to: "/version-policy", label: "Верзија" }
-];
-
-const operatorNavItems = [{ to: "/production", label: "Внес на печење" }];
+import { APP_BUILD, APP_VERSION } from "../lib/version";
 
 export function AppShell() {
   const { mode, toggle } = useTheme();
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const adminMode = isAdministrator(user);
-  const navItems = adminMode ? administratorNavItems : operatorNavItems;
+  const isHome = location.pathname === "/";
+
+  if (!adminMode) {
+    return (
+      <div className="shell shell--operator">
+        <main className="content content--operator">
+          <header className="topbar topbar--operator">
+            <div>
+              <p className="topbar-eyebrow">Оператор</p>
+              <h2>Внес на печење</h2>
+            </div>
+
+            <div className="topbar-actions">
+              <div className="user-chip">
+                <strong>{user?.fullName ?? "Гостин"}</strong>
+                <span>{user?.role ?? "unauthenticated"}</span>
+                <span>v{APP_VERSION} · build {APP_BUILD}</span>
+              </div>
+              <button className="theme-toggle" type="button" onClick={toggle}>
+                {mode === "light" ? "Dark mode" : "Light mode"}
+              </button>
+              <button className="ghost-button" type="button" onClick={logout}>
+                Одјава
+              </button>
+            </div>
+          </header>
+
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">П</div>
+    <div className="shell shell--operator">
+      <main className="content content--operator">
+        <header className="topbar topbar--operator">
           <div>
-            <p className="brand-eyebrow">Enterprise Suite</p>
-            <h1>Контрола на печење</h1>
-          </div>
-        </div>
-
-        <nav className="nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-link${isActive ? " nav-link--active" : ""}`}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
-      <main className="content">
-        <header className="topbar">
-          <div>
-            <p className="topbar-eyebrow">Малопродажен синџир</p>
-            <h2>{adminMode ? "Оперативен надзор и KPI" : "Операторски внес на печење"}</h2>
+            <p className="topbar-eyebrow">Администратор</p>
+            <h2>{isHome ? "Админ модули" : "Админ модул"}</h2>
           </div>
 
           <div className="topbar-actions">
+            {!isHome && (
+              <button className="ghost-button" type="button" onClick={() => navigate("/")}>
+                Назад
+              </button>
+            )}
             <div className="user-chip">
               <strong>{user?.fullName ?? "Гостин"}</strong>
               <span>{user?.role ?? "unauthenticated"}</span>
-              <span>v{APP_VERSION} · build {APP_BUILD} · {APP_BUILD_DATE}</span>
+              <span>v{APP_VERSION} · build {APP_BUILD}</span>
             </div>
             <button className="theme-toggle" type="button" onClick={toggle}>
               {mode === "light" ? "Dark mode" : "Light mode"}

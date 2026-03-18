@@ -11,6 +11,8 @@ type OperatorEntry = {
   itemName: string;
   quantity: number;
   note: string;
+  photoDataUrl: string;
+  photoName: string;
   createdAt: string;
 };
 
@@ -32,7 +34,11 @@ export function ProductionPage() {
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [entries, setEntries] = useState<OperatorEntry[]>([]);
-  const [draft, setDraft] = useState({ itemName: "", quantity: 10, note: "" });
+  const [draft, setDraft] = useState({ itemName: "", quantity: 10, note: "", photoDataUrl: "", photoName: "" });
+  const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
+  const photoReady = Boolean(draft.photoDataUrl);
+  const itemReady = Boolean(draft.itemName);
+  const quantityReady = draft.quantity > 0;
 
   const modeAccess = useMemo(() => {
     const permissions = permissionsQuery.data?.data ?? [];
@@ -57,6 +63,13 @@ export function ProductionPage() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
+    if (requestedMode === "pekara" || requestedMode === "pecenjara") {
+      setSelectedMode(requestedMode);
+      return;
+    }
+
     if (selectedMode && modeAccess[selectedMode]) {
       return;
     }
@@ -81,6 +94,21 @@ export function ProductionPage() {
     }
   }, [draft.itemName, itemsQuery.data]);
 
+  useEffect(() => {
+    if (!saveConfirmation) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSaveConfirmation(null);
+      setSelectedMode(null);
+      window.history.replaceState({}, "", "/production");
+      window.location.href = "/";
+    }, 1400);
+
+    return () => window.clearTimeout(timer);
+  }, [saveConfirmation]);
+
   if (permissionsQuery.isLoading || itemsQuery.isLoading) {
     return <PageState message="Се вчитуваат оперативните податоци..." />;
   }
@@ -95,120 +123,220 @@ export function ProductionPage() {
 
   if (!isAdministrator(user)) {
     return (
-      <section className="page-grid">
+      <section className="page-grid operator-fullscreen-page">
         <header className="page-header">
           <div>
             <p className="topbar-eyebrow">Оператор</p>
-            <h3>Избери тип на внес</h3>
-            <p className="meta">Операторот гледа само Пекара и Печењара. После изборот внесува количина и артикал.</p>
+            <h3>{selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Избери тип на внес"}</h3>
+            <p className="meta">
+              {selectedMode
+                ? "Овој модул е на цел екран. Со Назад се враќаш на двете големи кочки."
+                : "Операторот гледа само Пекара и Печењара. После изборот внесува количина и артикал."}
+            </p>
           </div>
+          {selectedMode && (
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+            >
+              Назад
+            </button>
+          )}
         </header>
 
-        <section className="operator-mode-grid">
-          {modeAccess.pekara && (
-            <button
-              type="button"
-              className={`operator-mode-card${selectedMode === "pekara" ? " operator-mode-card--active" : ""}`}
-              onClick={() => setSelectedMode("pekara")}
-            >
-              <strong>Пекара</strong>
-              <span>Леб, бурек, кифли, печива</span>
-            </button>
-          )}
+        {!selectedMode && (
+          <section className="operator-mode-grid">
+            {modeAccess.pekara && (
+              <button
+                type="button"
+                className="operator-mode-card"
+                onClick={() => setSelectedMode("pekara")}
+              >
+                <strong>Пекара</strong>
+                <span>Леб, бурек, кифли, печива</span>
+              </button>
+            )}
 
-          {modeAccess.pecenjara && (
-            <button
-              type="button"
-              className={`operator-mode-card${selectedMode === "pecenjara" ? " operator-mode-card--active" : ""}`}
-              onClick={() => setSelectedMode("pecenjara")}
-            >
-              <strong>Печењара</strong>
-              <span>Пилешко, месо и rotisserie</span>
-            </button>
-          )}
-        </section>
+            {modeAccess.pecenjara && (
+              <button
+                type="button"
+                className="operator-mode-card"
+                onClick={() => setSelectedMode("pecenjara")}
+              >
+                <strong>Печењара</strong>
+                <span>Пилешко, месо и rotisserie</span>
+              </button>
+            )}
+          </section>
+        )}
 
         {selectedMode && (
-          <section className="panel">
+          <section className="panel operator-entry-panel">
             <div className="panel-header">
               <h3>Внес за {selectedMode === "pekara" ? "Пекара" : "Печењара"}</h3>
             </div>
 
-            <div className="master-form master-form--operator">
-              <select
-                value={draft.itemName}
-                onChange={(event) => setDraft((current) => ({ ...current, itemName: event.target.value }))}
-              >
-                {itemsQuery.data?.data.map((item) => (
-                  <option key={item.itemId} value={item.nameMk}>
-                    {item.nameMk}
-                  </option>
-                ))}
-              </select>
+            {saveConfirmation && (
+              <div className="operator-success-banner">
+                <strong>Успешно снимено</strong>
+                <span>{saveConfirmation}</span>
+              </div>
+            )}
 
-              <input
-                type="number"
-                min="0"
-                value={draft.quantity}
-                onChange={(event) => setDraft((current) => ({ ...current, quantity: Number(event.target.value) }))}
-                placeholder="Количина"
-              />
+            <div className="operator-step-grid">
+              <article className={`operator-step-card${photoReady ? " operator-step-card--done" : ""}`}>
+                <div className="operator-step-card__header">
+                  <span className="pill">Чекор 1</span>
+                  <strong>Сликај печење</strong>
+                </div>
+                <label className="operator-photo-field">
+                  <span>Задолжителна слика од печењето</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) {
+                        setDraft((current) => ({ ...current, photoDataUrl: "", photoName: "" }));
+                        return;
+                      }
 
-              <input
-                value={draft.note}
-                onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
-                placeholder="Забелешка"
-              />
+                      const photoDataUrl = await fileToDataUrl(file);
+                      setDraft((current) => ({
+                        ...current,
+                        photoDataUrl,
+                        photoName: file.name
+                      }));
+                    }}
+                  />
+                </label>
 
-              <button
-                className="action-button"
-                type="button"
-                onClick={() => {
-                  if (!draft.itemName || draft.quantity <= 0) {
-                    return;
-                  }
+                {draft.photoDataUrl && (
+                  <div className="operator-photo-preview">
+                    <img src={draft.photoDataUrl} alt="Слика од печење" />
+                  </div>
+                )}
+              </article>
 
-                  const nextEntry: OperatorEntry = {
-                    id: createEntryId(),
-                    mode: selectedMode,
-                    itemName: draft.itemName,
-                    quantity: draft.quantity,
-                    note: draft.note,
-                    createdAt: new Date().toLocaleString("mk-MK")
-                  };
-                  const next = [nextEntry, ...entries];
-                  setEntries(next);
-                  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-                  setDraft((current) => ({ ...current, quantity: 10, note: "" }));
-                }}
-              >
-                Сними внес
-              </button>
+              {photoReady && (
+                <article className={`operator-step-card${itemReady ? " operator-step-card--done" : ""}`}>
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 2</span>
+                    <strong>Избери артикал</strong>
+                  </div>
+                  <select
+                    value={draft.itemName}
+                    onChange={(event) => setDraft((current) => ({ ...current, itemName: event.target.value }))}
+                  >
+                    {itemsQuery.data?.data.map((item) => (
+                      <option key={item.itemId} value={item.nameMk}>
+                        {item.nameMk}
+                      </option>
+                    ))}
+                  </select>
+                </article>
+              )}
+
+              {photoReady && itemReady && (
+                <article className={`operator-step-card${quantityReady ? " operator-step-card--done" : ""}`}>
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 3</span>
+                    <strong>Внеси количина</strong>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={draft.quantity}
+                    onChange={(event) => setDraft((current) => ({ ...current, quantity: Number(event.target.value) }))}
+                    placeholder="Количина"
+                  />
+                  <input
+                    value={draft.note}
+                    onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Забелешка"
+                  />
+                </article>
+              )}
+
+              {photoReady && itemReady && quantityReady && (
+                <article className="operator-step-card operator-step-card--done">
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 4</span>
+                    <strong>Сними внес</strong>
+                  </div>
+                  <button
+                    className="action-button"
+                    type="button"
+                    onClick={() => {
+                      if (!draft.itemName || draft.quantity <= 0 || !draft.photoDataUrl) {
+                        return;
+                      }
+
+                      const nextEntry: OperatorEntry = {
+                        id: createEntryId(),
+                        mode: selectedMode,
+                        itemName: draft.itemName,
+                        quantity: draft.quantity,
+                        note: draft.note,
+                        photoDataUrl: draft.photoDataUrl,
+                        photoName: draft.photoName,
+                        createdAt: new Date().toLocaleString("mk-MK")
+                      };
+                      const next = [nextEntry, ...entries];
+                      setEntries(next);
+                      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+                      setDraft((current) => ({
+                        ...current,
+                        quantity: 10,
+                        note: "",
+                        photoDataUrl: "",
+                        photoName: ""
+                      }));
+                      triggerSuccessFeedback();
+                      setSaveConfirmation(
+                        `${selectedMode === "pekara" ? "Пекара" : "Печењара"} · ${nextEntry.itemName} · ${nextEntry.quantity}`
+                      );
+                    }}
+                  >
+                    Сними внес
+                  </button>
+                </article>
+              )}
             </div>
           </section>
         )}
 
-        <section className="panel">
-          <div className="panel-header">
-            <h3>Последни внесови</h3>
-          </div>
+        {selectedMode && (
+          <section className="panel">
+            <div className="panel-header">
+              <h3>Последни внесови</h3>
+            </div>
 
-          <div className="card-list">
-            {entries
-              .filter((entry) => !selectedMode || entry.mode === selectedMode)
-              .map((entry) => (
-                <article className="workflow-card" key={entry.id}>
-                  <div className="workflow-card__top">
-                    <span className="pill">{entry.mode === "pekara" ? "Пекара" : "Печењара"}</span>
-                    <span className="meta">{entry.createdAt}</span>
-                  </div>
-                  <h4>{entry.itemName}</h4>
-                  <p>Количина: {entry.quantity}</p>
-                  <p>Забелешка: {entry.note || "Нема"}</p>
-                </article>
-              ))}
-          </div>
-        </section>
+            <div className="card-list">
+              {entries
+                .filter((entry) => !selectedMode || entry.mode === selectedMode)
+                .map((entry) => (
+                  <article className="workflow-card" key={entry.id}>
+                    <div className="workflow-card__top">
+                      <span className="pill">{entry.mode === "pekara" ? "Пекара" : "Печењара"}</span>
+                      <span className="meta">{entry.createdAt}</span>
+                    </div>
+                    <h4>{entry.itemName}</h4>
+                    <p>Количина: {entry.quantity}</p>
+                    <p>Забелешка: {entry.note || "Нема"}</p>
+                    <p>Слика: {entry.photoName || "Прикачена"}</p>
+                    <div className="operator-photo-preview operator-photo-preview--small">
+                      <img src={entry.photoDataUrl} alt={`Слика за ${entry.itemName}`} />
+                    </div>
+                  </article>
+                ))}
+            </div>
+          </section>
+        )}
       </section>
     );
   }
@@ -261,4 +389,50 @@ export function ProductionPage() {
       </div>
     </section>
   );
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Сликата не може да се вчита."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function triggerSuccessFeedback() {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate?.([120, 40, 120]);
+  }
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextConstructor) {
+    return;
+  }
+
+  try {
+    const audioContext = new AudioContextConstructor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.22);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.24);
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  } catch {
+    // Ignore audio feedback failures and keep save flow successful.
+  }
 }
