@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "react";
 import { useEffect, useState } from "react";
 import { PageState } from "./PageState";
 import { isNativeAndroid, startNativeUpdate } from "../lib/appUpdater";
+import { getApiBaseUrl, setApiBaseUrl } from "../lib/api";
 import { useVersionPolicy } from "../lib/queries";
 import { APP_BUILD, APP_BUILD_DATE, APP_VERSION, compareVersions } from "../lib/version";
 
@@ -9,13 +10,36 @@ export function VersionGate({ children }: PropsWithChildren) {
   const versionQuery = useVersionPolicy();
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [startingUpdate, setStartingUpdate] = useState(false);
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
 
   if (versionQuery.isLoading) {
     return <PageState message="Се проверува верзијата на апликацијата..." />;
   }
 
   if (versionQuery.isError || !versionQuery.data) {
-    return <PageState message="Не може да се провери верзијата на апликацијата." />;
+    return (
+      <section className="login-page">
+        <article className="login-card update-card">
+          <p className="topbar-eyebrow">Конекција</p>
+          <h2>Не може да се провери верзијата на апликацијата</h2>
+          <p>Провери ја API адресата. Ако backend-от е на друга IP, внеси ја точната адреса и пробај пак.</p>
+
+          <div className="master-form">
+            <input value={apiUrl} onChange={(event) => setApiUrl(event.target.value)} placeholder="http://192.168.11.40:8081/api/v1" />
+            <button
+              className="action-button"
+              type="button"
+              onClick={() => {
+                setApiBaseUrl(apiUrl);
+                window.location.reload();
+              }}
+            >
+              Сними API адреса и пробај пак
+            </button>
+          </div>
+        </article>
+      </section>
+    );
   }
 
   const policy = versionQuery.data.data;

@@ -1,4 +1,13 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081/api/v1";
+const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081/api/v1";
+const API_BASE_STORAGE_KEY = "pecenje-api-base-url";
+
+export function getApiBaseUrl() {
+  return window.localStorage.getItem(API_BASE_STORAGE_KEY) ?? DEFAULT_API_BASE;
+}
+
+export function setApiBaseUrl(url: string) {
+  window.localStorage.setItem(API_BASE_STORAGE_KEY, url);
+}
 
 function authHeaders(): Record<string, string> {
   const raw = window.localStorage.getItem("pecenje-auth");
@@ -15,7 +24,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: {
       ...authHeaders()
     }
@@ -28,7 +37,7 @@ async function request<T>(path: string): Promise<T> {
 }
 
 async function send<T>(path: string, method: "POST" | "PUT", body: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method,
     headers: {
       "Content-Type": "application/json",
