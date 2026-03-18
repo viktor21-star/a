@@ -52,15 +52,6 @@ sdk.dir=$SDK_DIR
 EOF
 
 AAPT2_OVERRIDE="$SDK_DIR/build-tools/34.0.0/aapt2"
-if [ -x "$AAPT2_OVERRIDE" ]; then
-  GRADLE_PROPERTIES_FILE="$ANDROID_DIR/gradle.properties"
-  if grep -q '^android.aapt2FromMavenOverride=' "$GRADLE_PROPERTIES_FILE"; then
-    sed -i "s|^android.aapt2FromMavenOverride=.*|android.aapt2FromMavenOverride=$AAPT2_OVERRIDE|" "$GRADLE_PROPERTIES_FILE"
-  else
-    printf '\nandroid.aapt2FromMavenOverride=%s\n' "$AAPT2_OVERRIDE" >> "$GRADLE_PROPERTIES_FILE"
-  fi
-fi
-
 cd "$FRONTEND_DIR"
 
 echo "==> Building web bundle for Android"
@@ -68,7 +59,11 @@ npm run mobile:sync
 
 echo "==> Building debug APK"
 cd "$ANDROID_DIR"
-./gradlew assembleDebug
+if [ -x "$AAPT2_OVERRIDE" ]; then
+  ./gradlew -Pandroid.aapt2FromMavenOverride="$AAPT2_OVERRIDE" assembleDebug
+else
+  ./gradlew assembleDebug
+fi
 
 echo
 echo "APK generated at:"
