@@ -11,6 +11,31 @@ export function VersionGate({ children }: PropsWithChildren) {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [startingUpdate, setStartingUpdate] = useState(false);
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
+  const policy = versionQuery.data?.data ?? null;
+  const needsForceUpdate = policy
+    ? policy.forceUpdate || compareVersions(APP_VERSION, policy.minimumSupportedVersion) < 0
+    : false;
+
+  useEffect(() => {
+    if (!policy || !needsForceUpdate || !isNativeAndroid()) {
+      return;
+    }
+
+    const attemptKey = `force-update:${policy.latestVersion}:${policy.buildNumber}`;
+    if (window.sessionStorage.getItem(attemptKey)) {
+      return;
+    }
+
+    window.sessionStorage.setItem(attemptKey, "1");
+    setStartingUpdate(true);
+    startNativeUpdate(policy.downloadUrl)
+      .catch((error: Error) => {
+        setUpdateError(error.message);
+      })
+      .finally(() => {
+        setStartingUpdate(false);
+      });
+  }, [needsForceUpdate, policy]);
 
   if (versionQuery.isLoading) {
     return <PageState message="Се проверува верзијата на апликацијата..." />;
@@ -42,30 +67,9 @@ export function VersionGate({ children }: PropsWithChildren) {
     );
   }
 
-  const policy = versionQuery.data.data;
-  const needsForceUpdate =
-    policy.forceUpdate || compareVersions(APP_VERSION, policy.minimumSupportedVersion) < 0;
-
-  useEffect(() => {
-    if (!needsForceUpdate || !isNativeAndroid()) {
-      return;
-    }
-
-    const attemptKey = `force-update:${policy.latestVersion}:${policy.buildNumber}`;
-    if (window.sessionStorage.getItem(attemptKey)) {
-      return;
-    }
-
-    window.sessionStorage.setItem(attemptKey, "1");
-    setStartingUpdate(true);
-    startNativeUpdate(policy.downloadUrl)
-      .catch((error: Error) => {
-        setUpdateError(error.message);
-      })
-      .finally(() => {
-        setStartingUpdate(false);
-      });
-  }, [needsForceUpdate, policy.buildNumber, policy.downloadUrl, policy.latestVersion]);
+  if (!policy) {
+    return <PageState message="Не може да се вчита политиката за верзија." />;
+  }
 
   if (needsForceUpdate) {
     return (
