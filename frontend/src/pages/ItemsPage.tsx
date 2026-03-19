@@ -1,26 +1,25 @@
-import { useState } from "react";
-import { MasterDataForm } from "../components/MasterDataForm";
+import { useMemo, useState } from "react";
 import { isAdministrator, useAuth } from "../lib/auth";
 import { useItems } from "../lib/queries";
-import { useCreateItem, useUpdateItem } from "../lib/queries";
 import { PageState } from "../components/PageState";
-import type { UpsertItemRequest } from "../lib/types";
+import type { Item } from "../lib/types";
 
 export function ItemsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useItems();
-  const createItem = useCreateItem();
-  const updateItem = useUpdateItem();
-  const [form, setForm] = useState<UpsertItemRequest>({
-    code: "",
-    nameMk: "",
-    groupName: "",
-    salesPrice: 0,
-    wasteLimitPct: 0,
-    isActive: true
-  });
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const formError = (createItem.error || updateItem.error) as Error | null;
+  const [search, setSearch] = useState("");
+
+  const filteredItems = useMemo(() => {
+    const rows = data?.data ?? [];
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return rows;
+    }
+
+    return rows.filter((item) =>
+      [item.nameMk, item.code, item.groupName].some((value) => value.toLowerCase().includes(query))
+    );
+  }, [data, search]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Артиклите ги одржува администратор." />;
@@ -40,96 +39,64 @@ export function ItemsPage() {
         <div>
           <p className="topbar-eyebrow">Шифарници</p>
           <h3>Артикли</h3>
+          <p className="meta">Артиклите доаѓаат директно од API. Овде нема рачен внес, туку само преглед и пребарување.</p>
         </div>
       </header>
 
-      <div className="panel-grid panel-grid--production">
-        <MasterDataForm
-          title={editingId ? "Измена артикал" : "Нов артикал"}
-          submitLabel={editingId ? "Сними измени" : "Зачувај артикал"}
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (editingId) {
-              updateItem.mutate(
-                { itemId: editingId, payload: form },
-                {
-                  onSuccess: () => {
-                    setEditingId(null);
-                    setForm({
-                      code: "",
-                      nameMk: "",
-                      groupName: "",
-                      salesPrice: 0,
-                      wasteLimitPct: 0,
-                      isActive: true
-                    });
-                  }
-                }
-              );
-              return;
-            }
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Пребарување низ артикли</h3>
+        </div>
+        <input
+          className="search-input"
+          value={search}
+          placeholder="Пребарај по име, код или група"
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </section>
 
-            createItem.mutate(form, {
-              onSuccess: () => {
-                setForm({
-                  code: "",
-                  nameMk: "",
-                  groupName: "",
-                  salesPrice: 0,
-                  wasteLimitPct: 0,
-                  isActive: true
-                });
-              }
-            });
-          }}
-        >
-          <input placeholder="Код" value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} />
-          <input placeholder="Име" value={form.nameMk} onChange={(event) => setForm((current) => ({ ...current, nameMk: event.target.value }))} />
-          <input placeholder="Група" value={form.groupName} onChange={(event) => setForm((current) => ({ ...current, groupName: event.target.value }))} />
-          <input
-            placeholder="Цена"
-            type="number"
-            value={form.salesPrice}
-            onChange={(event) => setForm((current) => ({ ...current, salesPrice: Number(event.target.value) }))}
-          />
-          <input
-            placeholder="Лимит отпад %"
-            type="number"
-            value={form.wasteLimitPct}
-            onChange={(event) => setForm((current) => ({ ...current, wasteLimitPct: Number(event.target.value) }))}
-          />
-          {formError && <div className="form-error">{formError.message}</div>}
-        </MasterDataForm>
-
-        <div className="report-table">
-          {data.data.map((item) => (
-            <div className="report-row report-row--master" key={item.itemId}>
-              <strong>{item.nameMk}</strong>
-              <span>Код: {item.code}</span>
-              <span>Група: {item.groupName}</span>
-              <span>Цена: {item.salesPrice}</span>
-              <span>Лимит отпад: {item.wasteLimitPct}%</span>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  setEditingId(item.itemId);
-                  setForm({
-                    code: item.code,
-                    nameMk: item.nameMk,
-                    groupName: item.groupName,
-                    salesPrice: item.salesPrice,
-                    wasteLimitPct: item.wasteLimitPct,
-                    isActive: item.isActive
-                  });
-                }}
-              >
-                Измени
-              </button>
-            </div>
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Листа на артикли</h3>
+          <span>{filteredItems.length} артикли</span>
+        </div>
+        <div className="card-list admin-summary-grid">
+          {filteredItems.map((item) => (
+            <article className="workflow-card admin-tile-card" key={item.itemId}>
+              <div className="workflow-card__top">
+                <span className="pill">{item.code}</span>
+                <span className="status-chip">{item.isActive ? "Активен" : "Неактивен"}</span>
+              </div>
+              <h4>{item.nameMk}</h4>
+              <p>Група код: {item.groupCode || "-"}</p>
+              <p>Група: {item.groupName}</p>
+              <p>Се користи во: {describeItemModes(item)}</p>
+              <p>Цена: {item.salesPrice}</p>
+              <p>Лимит отпад: {item.wasteLimitPct}%</p>
+            </article>
           ))}
         </div>
-      </div>
+      </section>
     </section>
   );
+}
+
+function describeItemModes(item: Item) {
+  const modes = [
+    itemMatchesMode(item, "pekara") ? "Пекара" : null,
+    itemMatchesMode(item, "pecenjara") ? "Печењара" : null,
+    item.groupCode?.trim() === "220" || item.groupCode?.trim() === "221" ? "Пијара" : null
+  ].filter(Boolean);
+
+  return modes.length > 0 ? modes.join(", ") : "Не се користи";
+}
+
+function itemMatchesMode(item: Item, mode: "pekara" | "pecenjara") {
+  const groupCode = item.groupCode?.trim();
+
+  if (mode === "pekara") {
+    return groupCode === "260";
+  }
+
+  return groupCode === "251";
 }

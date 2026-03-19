@@ -29,6 +29,8 @@ export function UserAccessPage() {
     roleCode: "operator",
     isActive: true
   });
+  const selectedUser = usersQuery.data?.data.find((entry) => entry.userId === selectedUserId) ?? null;
+  const operatorUserSelected = selectedUser?.roleCode === "operator";
 
   useEffect(() => {
     if (!selectedUserId && usersQuery.data?.data.length) {
@@ -170,6 +172,14 @@ export function UserAccessPage() {
 
           {locationsQuery.isLoading && <div className="list-card">Се вчитуваат привилегии...</div>}
 
+          {operatorUserSelected && (
+            <div className="operator-explainer">
+              <strong>Операторска логика</strong>
+              <span>Операторот треба да има една работна локација.</span>
+              <span>Локацијата на која е вклучено печење ќе биде единствената што ќе му се прикажува во внесот.</span>
+            </div>
+          )}
+
           <div className="card-list admin-summary-grid">
             {draft.map((entry, index) => (
               <article className="permission-card permission-card--large" key={`${entry.locationId}-${entry.locationName}`}>
@@ -222,11 +232,33 @@ export function UserAccessPage() {
   );
 
   function toggle(index: number, field: PermissionField) {
-    setDraft((current) =>
-      current.map((entry, currentIndex) =>
-        currentIndex === index ? { ...entry, [field]: !entry[field] } : entry
-      )
-    );
+    setDraft((current) => {
+      const target = current[index];
+      if (!target) {
+        return current;
+      }
+
+      const nextValue = !target[field];
+
+      if (operatorUserSelected && (field === "canBake" || field === "canUsePekara" || field === "canUsePecenjara") && nextValue) {
+        return current.map((entry, currentIndex) => {
+          if (currentIndex === index) {
+            return { ...entry, [field]: nextValue };
+          }
+
+          return {
+            ...entry,
+            canBake: false,
+            canUsePekara: false,
+            canUsePecenjara: false
+          };
+        });
+      }
+
+      return current.map((entry, currentIndex) =>
+        currentIndex === index ? { ...entry, [field]: nextValue } : entry
+      );
+    });
   }
 
   function updateOvenType(index: number, ovenType: string) {

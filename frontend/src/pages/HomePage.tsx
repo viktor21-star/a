@@ -54,7 +54,7 @@ export function HomePage() {
           <div>
             <p className="topbar-eyebrow">Оператор</p>
             <h3>Избери дел за внес</h3>
-            <p className="meta">Операторот работи само со две големи кочки: Пекара и Печењара.</p>
+            <p className="meta">Операторот работи со три големи кочки: Пекара, Печењара и Пијара.</p>
           </div>
         </header>
 
@@ -79,6 +79,17 @@ export function HomePage() {
           >
             <strong>Печењара</strong>
             <span>Пилешко, месо и производи што се водат преку печењара.</span>
+          </button>
+
+          <button
+            type="button"
+            className="operator-home-card"
+            onClick={() => {
+              window.location.href = "/production?mode=pijara";
+            }}
+          >
+            <strong>Пијара</strong>
+            <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
           </button>
         </section>
       </section>

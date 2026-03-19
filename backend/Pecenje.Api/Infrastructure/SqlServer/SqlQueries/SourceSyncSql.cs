@@ -14,14 +14,72 @@ public static class SourceSyncSql
         """;
 
     public const string ReadItemsFromKatart = """
-        SELECT
-            CAST(Sifra_Art AS nvarchar(100)) AS SourceItemId,
-            CAST(Sifra_Art AS nvarchar(50)) AS Code,
-            CAST(ImeArt AS nvarchar(200)) AS NameMk,
-            CAST('Некатегоризирано' AS nvarchar(100)) AS GroupName,
-            CAST(0 AS decimal(18,2)) AS SalesPrice,
-            CAST(1 AS bit) AS IsActive
-        FROM dbo.katart
-        ORDER BY ImeArt;
+        DECLARE @subgroupColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.katart', 'Sifra_Podg') IS NOT NULL SET @subgroupColumn = 'Sifra_Podg';
+        ELSE IF COL_LENGTH('dbo.katart', 'SifPodg') IS NOT NULL SET @subgroupColumn = 'SifPodg';
+        ELSE IF COL_LENGTH('dbo.katart', 'Podgrupa') IS NOT NULL SET @subgroupColumn = 'Podgrupa';
+
+        DECLARE @podgrupiSubgroupColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.podgrupi', 'Sifra_Podg') IS NOT NULL SET @podgrupiSubgroupColumn = 'Sifra_Podg';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'SifPodg') IS NOT NULL SET @podgrupiSubgroupColumn = 'SifPodg';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'Podgrupa') IS NOT NULL SET @podgrupiSubgroupColumn = 'Podgrupa';
+
+        DECLARE @podgrupiGroupColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.podgrupi', 'Sifra_Gr') IS NOT NULL SET @podgrupiGroupColumn = 'Sifra_Gr';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'SifGrupa') IS NOT NULL SET @podgrupiGroupColumn = 'SifGrupa';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'Grupa') IS NOT NULL SET @podgrupiGroupColumn = 'Grupa';
+
+        DECLARE @podgrupiNameColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.podgrupi', 'ImePodg') IS NOT NULL SET @podgrupiNameColumn = 'ImePodg';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'NazivPodg') IS NOT NULL SET @podgrupiNameColumn = 'NazivPodg';
+        ELSE IF COL_LENGTH('dbo.podgrupi', 'PodgrupaNaziv') IS NOT NULL SET @podgrupiNameColumn = 'PodgrupaNaziv';
+
+        DECLARE @fallbackGroupColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.katart', 'Sifra_Gr') IS NOT NULL SET @fallbackGroupColumn = 'Sifra_Gr';
+        ELSE IF COL_LENGTH('dbo.katart', 'Grupa') IS NOT NULL SET @fallbackGroupColumn = 'Grupa';
+        ELSE IF COL_LENGTH('dbo.katart', 'Grupa_Art') IS NOT NULL SET @fallbackGroupColumn = 'Grupa_Art';
+        ELSE IF COL_LENGTH('dbo.katart', 'SifGrupa') IS NOT NULL SET @fallbackGroupColumn = 'SifGrupa';
+
+        DECLARE @fallbackGroupNameColumn nvarchar(128) = NULL;
+
+        IF COL_LENGTH('dbo.katart', 'ImeGrupa') IS NOT NULL SET @fallbackGroupNameColumn = 'ImeGrupa';
+        ELSE IF COL_LENGTH('dbo.katart', 'NazivGrupa') IS NOT NULL SET @fallbackGroupNameColumn = 'NazivGrupa';
+        ELSE IF COL_LENGTH('dbo.katart', 'GrupaNaziv') IS NOT NULL SET @fallbackGroupNameColumn = 'GrupaNaziv';
+
+        DECLARE @sql nvarchar(max) = N'
+            SELECT
+                CAST(k.Sifra_Art AS nvarchar(100)) AS SourceItemId,
+                CAST(k.Sifra_Art AS nvarchar(50)) AS Code,
+                CAST(k.ImeArt AS nvarchar(200)) AS NameMk,
+                ' + CASE
+                    WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL AND @podgrupiGroupColumn IS NOT NULL
+                      THEN N'CAST(p.' + QUOTENAME(@podgrupiGroupColumn) + N' AS nvarchar(50))'
+                    WHEN @fallbackGroupColumn IS NOT NULL
+                      THEN N'CAST(k.' + QUOTENAME(@fallbackGroupColumn) + N' AS nvarchar(50))'
+                    ELSE N'CAST('''' AS nvarchar(50))'
+                  END + N' AS GroupCode,
+                ' + CASE
+                    WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL AND @podgrupiNameColumn IS NOT NULL
+                      THEN N'CAST(p.' + QUOTENAME(@podgrupiNameColumn) + N' AS nvarchar(100))'
+                    WHEN @fallbackGroupNameColumn IS NOT NULL
+                      THEN N'CAST(k.' + QUOTENAME(@fallbackGroupNameColumn) + N' AS nvarchar(100))'
+                    ELSE N'CAST(''Некатегоризирано'' AS nvarchar(100))'
+                  END + N' AS GroupName,
+                CAST(0 AS decimal(18,2)) AS SalesPrice,
+                CAST(1 AS bit) AS IsActive
+            FROM dbo.katart k ' +
+            CASE
+              WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL
+                THEN N'LEFT JOIN dbo.podgrupi p ON CAST(k.' + QUOTENAME(@subgroupColumn) + N' AS nvarchar(50)) = CAST(p.' + QUOTENAME(@podgrupiSubgroupColumn) + N' AS nvarchar(50)) '
+              ELSE N''
+            END +
+            N'ORDER BY k.ImeArt;';
+
+        EXEC sp_executesql @sql;
         """;
 }

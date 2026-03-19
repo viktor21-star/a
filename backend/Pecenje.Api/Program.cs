@@ -2,6 +2,7 @@ using Pecenje.Api.Configuration;
 using Pecenje.Api.Endpoints;
 using Pecenje.Api.Extensions;
 using Pecenje.Api.Services;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,8 +29,14 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
+staticFileContentTypeProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
+
 app.UseExceptionHandler();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = staticFileContentTypeProvider
+});
 app.UseCors("frontend");
 
 if (app.Environment.IsDevelopment())

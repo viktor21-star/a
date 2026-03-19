@@ -2,14 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
 import { useBatches, useItems, useUserLocations, useWasteEntries } from "../lib/queries";
+import type { Item } from "../lib/types";
 
-type EntryMode = "pekara" | "pecenjara";
+type EntryMode = "pekara" | "pecenjara" | "pijara";
+
+type OperatorEntryLine = {
+  itemName: string;
+  quantity: number;
+  classB: boolean;
+  classBQuantity: number;
+};
 
 type OperatorEntry = {
   id: string;
   mode: EntryMode;
-  itemName: string;
-  quantity: number;
+  locationId: number;
+  locationName: string;
+  items: OperatorEntryLine[];
   note: string;
   photoDataUrl: string;
   photoName: string;
@@ -34,18 +43,41 @@ export function ProductionPage() {
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [entries, setEntries] = useState<OperatorEntry[]>([]);
-  const [draft, setDraft] = useState({ itemName: "", quantity: 10, note: "", photoDataUrl: "", photoName: "" });
+  const [draft, setDraft] = useState({ note: "", photoDataUrl: "", photoName: "" });
+  const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([
+    { itemName: "", quantity: 10, classB: false, classBQuantity: 0 }
+  ]);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
-  const itemReady = Boolean(draft.itemName);
-  const quantityReady = draft.quantity > 0;
+  const itemReady = draftItems.some((entry) => Boolean(entry.itemName));
+  const quantityReady = draftItems.every(
+    (entry) =>
+      !entry.itemName ||
+      (entry.quantity > 0 && (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0))
+  );
+  const readyItems = draftItems.filter(
+    (entry) => entry.itemName && entry.quantity > 0 && (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0)
+  );
+  const availableItems = useMemo(() => filterItemsForMode(itemsQuery.data?.data ?? [], selectedMode), [itemsQuery.data, selectedMode]);
+  const assignedBakeLocations = useMemo(
+    () => (permissionsQuery.data?.data ?? []).filter((entry) => entry.canBake),
+    [permissionsQuery.data]
+  );
+  const activeLocation = useMemo(() => {
+    if (!assignedBakeLocations.length) {
+      return null;
+    }
+
+    return assignedBakeLocations.find((entry) => entry.locationId === user?.defaultLocationId) ?? assignedBakeLocations[0];
+  }, [assignedBakeLocations, user?.defaultLocationId]);
 
   const modeAccess = useMemo(() => {
     const permissions = permissionsQuery.data?.data ?? [];
 
     return {
       pekara: permissions.some((entry) => entry.canBake && entry.canUsePekara),
-      pecenjara: permissions.some((entry) => entry.canBake && entry.canUsePecenjara)
+      pecenjara: permissions.some((entry) => entry.canBake && entry.canUsePecenjara),
+      pijara: permissions.some((entry) => entry.canBake)
     };
   }, [permissionsQuery.data]);
 
@@ -56,7 +88,30 @@ export function ProductionPage() {
     }
 
     try {
-      setEntries(JSON.parse(raw) as OperatorEntry[]);
+      const parsed = JSON.parse(raw) as Array<
+        OperatorEntry | (Omit<OperatorEntry, "items"> & { itemName?: string; quantity?: number })
+      >;
+      setEntries(
+        parsed.map((entry) => ({
+          ...entry,
+          items:
+            "items" in entry && Array.isArray(entry.items)
+              ? entry.items.map((line) => ({
+                  itemName: line.itemName,
+                  quantity: line.quantity,
+                  classB: "classB" in line ? Boolean(line.classB) : false,
+                  classBQuantity: "classBQuantity" in line ? Number(line.classBQuantity) || 0 : 0
+                }))
+              : [
+                  {
+                    itemName: entry.itemName ?? "Непознат артикал",
+                    quantity: entry.quantity ?? 0,
+                    classB: false,
+                    classBQuantity: 0
+                  }
+                ]
+        }))
+      );
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -65,7 +120,7 @@ export function ProductionPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
-    if (requestedMode === "pekara" || requestedMode === "pecenjara") {
+    if (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") {
       setSelectedMode(requestedMode);
       return;
     }
@@ -84,15 +139,40 @@ export function ProductionPage() {
       return;
     }
 
+    if (modeAccess.pijara) {
+      setSelectedMode("pijara");
+      return;
+    }
+
     setSelectedMode(null);
   }, [modeAccess, selectedMode]);
 
   useEffect(() => {
-    const firstItem = itemsQuery.data?.data[0]?.nameMk;
-    if (firstItem && !draft.itemName) {
-      setDraft((current) => ({ ...current, itemName: firstItem }));
+    const firstItem = availableItems[0]?.nameMk;
+    if (firstItem && !draftItems[0]?.itemName) {
+      setDraftItems((current) =>
+        current.map((entry, index) => (index === 0 ? { ...entry, itemName: firstItem } : entry))
+      );
     }
-  }, [draft.itemName, itemsQuery.data]);
+  }, [availableItems, draftItems]);
+
+  useEffect(() => {
+    if (!availableItems.length) {
+      return;
+    }
+
+    setDraftItems((current) =>
+      current.map((entry, index) => {
+        if (entry.itemName && availableItems.some((item) => item.nameMk === entry.itemName)) {
+          return entry;
+        }
+
+        return index === 0
+          ? { ...entry, itemName: availableItems[0]?.nameMk ?? "" }
+          : { ...entry, itemName: availableItems[0]?.nameMk ?? "" };
+      })
+    );
+  }, [availableItems, selectedMode]);
 
   useEffect(() => {
     if (!saveConfirmation) {
@@ -117,8 +197,16 @@ export function ProductionPage() {
     return <PageState message="Не може да се вчита оперативниот модул." />;
   }
 
-  if (!modeAccess.pekara && !modeAccess.pecenjara) {
-    return <PageState message="Корисникот нема дозвола за внес во Пекара или Печењара." />;
+  if (selectedMode && !availableItems.length) {
+    return <PageState message="Нема активни артикли за избраниот модул." />;
+  }
+
+  if (!modeAccess.pekara && !modeAccess.pecenjara && !modeAccess.pijara) {
+    return <PageState message="Корисникот нема дозвола за внес во Пекара, Печењара или Пијара." />;
+  }
+
+  if (!isAdministrator(user) && !activeLocation) {
+    return <PageState message="Операторот нема доделена работна локација за печење." />;
   }
 
   if (!isAdministrator(user)) {
@@ -127,11 +215,19 @@ export function ProductionPage() {
         <header className="page-header">
           <div>
             <p className="topbar-eyebrow">Оператор</p>
-            <h3>{selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Избери тип на внес"}</h3>
+            <h3>
+              {selectedMode === "pekara"
+                ? "Пекара"
+                : selectedMode === "pecenjara"
+                  ? "Печењара"
+                  : selectedMode === "pijara"
+                    ? "Пијара"
+                    : "Избери тип на внес"}
+            </h3>
             <p className="meta">
               {selectedMode
                 ? "Овој модул е на цел екран. Со Назад се враќаш на двете големи кочки."
-                : "Операторот гледа само Пекара и Печењара. После изборот внесува количина и артикал."}
+                : "Операторот гледа Пекара, Печењара и Пијара. После изборот внесува артикли, количини и задолжителна слика."}
             </p>
           </div>
           {selectedMode && (
@@ -170,13 +266,51 @@ export function ProductionPage() {
                 <span>Пилешко, месо и rotisserie</span>
               </button>
             )}
+
+            {modeAccess.pijara && (
+              <button
+                type="button"
+                className="operator-mode-card"
+                onClick={() => setSelectedMode("pijara")}
+              >
+                <strong>Пијара</strong>
+                <span>Пријава на артикли што одат како Класа Б.</span>
+              </button>
+            )}
           </section>
         )}
 
         {selectedMode && (
           <section className="panel operator-entry-panel">
             <div className="panel-header">
-              <h3>Внес за {selectedMode === "pekara" ? "Пекара" : "Печењара"}</h3>
+              <h3>
+                Внес за{" "}
+                {selectedMode === "pekara"
+                  ? "Пекара"
+                  : selectedMode === "pecenjara"
+                    ? "Печењара"
+                    : "Пијара"}
+              </h3>
+            </div>
+
+            <div className="operator-explainer">
+              <strong>Како се внесува:</strong>
+              <span>Работна локација: {activeLocation?.locationName}</span>
+              {selectedMode === "pijara" ? (
+                <>
+                  <span>1. Сликај го артикалот што го пријавуваш.</span>
+                  <span>2. Додади еден или повеќе артикли.</span>
+                  <span>3. За секој артикал означи дали е Класа Б.</span>
+                  <span>4. Внеси количина и количина за Класа Б, па сними.</span>
+                </>
+              ) : (
+                <>
+                  <span>1. Сликај го печењето.</span>
+                  <span>2. Додади еден или повеќе артикли што се испечени.</span>
+                  <span>3. За секој артикал внеси количина.</span>
+                  <span>4. Ако треба, додади забелешка и сними.</span>
+                </>
+              )}
             </div>
 
             {saveConfirmation && (
@@ -190,10 +324,10 @@ export function ProductionPage() {
               <article className={`operator-step-card${photoReady ? " operator-step-card--done" : ""}`}>
                 <div className="operator-step-card__header">
                   <span className="pill">Чекор 1</span>
-                  <strong>Сликај печење</strong>
+                  <strong>{selectedMode === "pijara" ? "Сликај артикал" : "Сликај печење"}</strong>
                 </div>
                 <label className="operator-photo-field">
-                  <span>Задолжителна слика од печењето</span>
+                  <span>{selectedMode === "pijara" ? "Задолжителна слика од артикалот" : "Задолжителна слика од печењето"}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -226,18 +360,107 @@ export function ProductionPage() {
                 <article className={`operator-step-card${itemReady ? " operator-step-card--done" : ""}`}>
                   <div className="operator-step-card__header">
                     <span className="pill">Чекор 2</span>
-                    <strong>Избери артикал</strong>
+                    <strong>{selectedMode === "pijara" ? "Додади артикли за пријава" : "Додади артикли за печење"}</strong>
                   </div>
-                  <select
-                    value={draft.itemName}
-                    onChange={(event) => setDraft((current) => ({ ...current, itemName: event.target.value }))}
-                  >
-                    {itemsQuery.data?.data.map((item) => (
-                      <option key={item.itemId} value={item.nameMk}>
-                        {item.nameMk}
-                      </option>
+                  <div className="operator-lines-grid">
+                    {draftItems.map((entry, index) => (
+                      <div className="operator-line-row" key={`${entry.itemName}-${index}`}>
+                        <select
+                          value={entry.itemName}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setDraftItems((current) =>
+                              current.map((line, lineIndex) =>
+                                lineIndex === index ? { ...line, itemName: nextValue } : line
+                              )
+                            );
+                          }}
+                        >
+                          {availableItems.map((item) => (
+                            <option key={item.itemId} value={item.nameMk}>
+                              {item.nameMk}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.quantity}
+                          onChange={(event) => {
+                            const nextValue = Number(event.target.value);
+                            setDraftItems((current) =>
+                              current.map((line, lineIndex) =>
+                                lineIndex === index ? { ...line, quantity: nextValue } : line
+                              )
+                            );
+                          }}
+                          placeholder="Количина"
+                        />
+                        {selectedMode === "pijara" && (
+                          <>
+                            <label className="operator-classb-toggle">
+                              <input
+                                type="checkbox"
+                                checked={entry.classB}
+                                onChange={(event) => {
+                                  const checked = event.target.checked;
+                                  setDraftItems((current) =>
+                                    current.map((line, lineIndex) =>
+                                      lineIndex === index
+                                        ? { ...line, classB: checked, classBQuantity: checked ? Math.max(line.classBQuantity, 1) : 0 }
+                                        : line
+                                    )
+                                  );
+                                }}
+                              />
+                              <span>Класа Б</span>
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={entry.classB ? entry.classBQuantity : 0}
+                              onChange={(event) => {
+                                const nextValue = Number(event.target.value);
+                                setDraftItems((current) =>
+                                  current.map((line, lineIndex) =>
+                                    lineIndex === index
+                                      ? { ...line, classB: nextValue > 0 || line.classB, classBQuantity: nextValue }
+                                      : line
+                                  )
+                                );
+                              }}
+                              placeholder="Кол. Класа Б"
+                              disabled={!entry.classB}
+                            />
+                          </>
+                        )}
+                        {draftItems.length > 1 && (
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => {
+                              setDraftItems((current) => current.filter((_, lineIndex) => lineIndex !== index));
+                            }}
+                          >
+                            Тргни
+                          </button>
+                        )}
+                      </div>
                     ))}
-                  </select>
+                  </div>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      const fallbackItem = availableItems[0]?.nameMk ?? "";
+                      setDraftItems((current) => [
+                        ...current,
+                        { itemName: fallbackItem, quantity: 10, classB: false, classBQuantity: 0 }
+                      ]);
+                    }}
+                  >
+                    Додади уште артикал
+                  </button>
                 </article>
               )}
 
@@ -245,15 +468,8 @@ export function ProductionPage() {
                 <article className={`operator-step-card${quantityReady ? " operator-step-card--done" : ""}`}>
                   <div className="operator-step-card__header">
                     <span className="pill">Чекор 3</span>
-                    <strong>Внеси количина</strong>
+                    <strong>{selectedMode === "pijara" ? "Провери Класа Б и внеси забелешка" : "Провери количини и внеси забелешка"}</strong>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    value={draft.quantity}
-                    onChange={(event) => setDraft((current) => ({ ...current, quantity: Number(event.target.value) }))}
-                    placeholder="Количина"
-                  />
                   <input
                     value={draft.note}
                     onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
@@ -272,15 +488,16 @@ export function ProductionPage() {
                     className="action-button"
                     type="button"
                     onClick={() => {
-                      if (!draft.itemName || draft.quantity <= 0 || !draft.photoDataUrl) {
+                      if (readyItems.length === 0 || !draft.photoDataUrl) {
                         return;
                       }
 
                       const nextEntry: OperatorEntry = {
                         id: createEntryId(),
                         mode: selectedMode,
-                        itemName: draft.itemName,
-                        quantity: draft.quantity,
+                        locationId: activeLocation?.locationId ?? 0,
+                        locationName: activeLocation?.locationName ?? "Непозната локација",
+                        items: readyItems,
                         note: draft.note,
                         photoDataUrl: draft.photoDataUrl,
                         photoName: draft.photoName,
@@ -289,16 +506,18 @@ export function ProductionPage() {
                       const next = [nextEntry, ...entries];
                       setEntries(next);
                       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-                      setDraft((current) => ({
-                        ...current,
-                        quantity: 10,
-                        note: "",
-                        photoDataUrl: "",
-                        photoName: ""
-                      }));
+                      setDraft({ note: "", photoDataUrl: "", photoName: "" });
+                      setDraftItems([
+                        {
+                          itemName: availableItems[0]?.nameMk ?? "",
+                          quantity: 10,
+                          classB: false,
+                          classBQuantity: 0
+                        }
+                      ]);
                       triggerSuccessFeedback();
                       setSaveConfirmation(
-                        `${selectedMode === "pekara" ? "Пекара" : "Печењара"} · ${nextEntry.itemName} · ${nextEntry.quantity}`
+                        `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
                       );
                     }}
                   >
@@ -322,15 +541,25 @@ export function ProductionPage() {
                 .map((entry) => (
                   <article className="workflow-card" key={entry.id}>
                     <div className="workflow-card__top">
-                      <span className="pill">{entry.mode === "pekara" ? "Пекара" : "Печењара"}</span>
+                      <span className="pill">
+                        {entry.mode === "pekara" ? "Пекара" : entry.mode === "pecenjara" ? "Печењара" : "Пијара"}
+                      </span>
                       <span className="meta">{entry.createdAt}</span>
                     </div>
-                    <h4>{entry.itemName}</h4>
-                    <p>Количина: {entry.quantity}</p>
+                    <p>Локација: {entry.locationName}</p>
+                    <h4>{entry.items.map((line) => line.itemName).join(", ")}</h4>
+                    <div className="operator-saved-lines">
+                      {entry.items.map((line) => (
+                        <span key={`${entry.id}-${line.itemName}`}>
+                          {line.itemName}: {line.quantity}
+                          {entry.mode === "pijara" && line.classB ? ` · Класа Б: ${line.classBQuantity}` : ""}
+                        </span>
+                      ))}
+                    </div>
                     <p>Забелешка: {entry.note || "Нема"}</p>
                     <p>Слика: {entry.photoName || "Прикачена"}</p>
                     <div className="operator-photo-preview operator-photo-preview--small">
-                      <img src={entry.photoDataUrl} alt={`Слика за ${entry.itemName}`} />
+                      <img src={entry.photoDataUrl} alt={`Слика за ${entry.items.map((line) => line.itemName).join(", ")}`} />
                     </div>
                   </article>
                 ))}
@@ -389,6 +618,28 @@ export function ProductionPage() {
       </div>
     </section>
   );
+}
+
+function filterItemsForMode(items: Item[], mode: EntryMode | null) {
+  if (!mode) {
+    return items;
+  }
+
+  return items.filter((item) => matchesMode(item, mode));
+}
+
+function matchesMode(item: Item, mode: EntryMode) {
+  const groupCode = item.groupCode?.trim();
+
+  if (mode === "pekara") {
+    return groupCode === "260";
+  }
+
+  if (mode === "pecenjara") {
+    return groupCode === "251";
+  }
+
+  return groupCode === "220" || groupCode === "221";
 }
 
 function fileToDataUrl(file: File) {

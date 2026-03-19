@@ -119,6 +119,7 @@ export type Item = {
   itemId: number;
   code: string;
   nameMk: string;
+  groupCode: string;
   groupName: string;
   salesPrice: number;
   wasteLimitPct: number;

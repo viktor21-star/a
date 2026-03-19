@@ -15,10 +15,10 @@ public sealed class DemoMasterDataRepository : IMasterDataRepository
 
     private static readonly List<ItemDto> Items =
     [
-        new ItemDto(101, "BUR-MES", "Бурек со месо", "Буреци", 45, 5, true),
-        new ItemDto(102, "BUR-SIR", "Бурек со сирење", "Буреци", 42, 5, true),
-        new ItemDto(201, "KIF-STD", "Кифла", "Пецива", 18, 3, true),
-        new ItemDto(301, "PIL-CEL", "Печено пиле", "Пилиња", 289, 2, true)
+        new ItemDto(101, "BUR-MES", "Бурек со месо", "260", "Буреци", 45, 5, true),
+        new ItemDto(102, "BUR-SIR", "Бурек со сирење", "260", "Буреци", 42, 5, true),
+        new ItemDto(201, "KIF-STD", "Кифла", "260", "Пецива", 18, 3, true),
+        new ItemDto(301, "PIL-CEL", "Печено пиле", "251", "Пилиња", 289, 2, true)
     ];
 
     public Task<IReadOnlyList<LocationDto>> GetLocationsAsync(CancellationToken cancellationToken = default)
@@ -55,7 +55,7 @@ public sealed class DemoMasterDataRepository : IMasterDataRepository
     public Task<ItemDto> CreateItemAsync(UpsertItemRequest request, CancellationToken cancellationToken = default)
     {
         var nextId = Items.Count == 0 ? 1 : Items.Max((item) => item.ItemId) + 1;
-        var created = new ItemDto(nextId, request.Code, request.NameMk, request.GroupName, request.SalesPrice, request.WasteLimitPct, request.IsActive);
+        var created = new ItemDto(nextId, request.Code, request.NameMk, "000", request.GroupName, request.SalesPrice, request.WasteLimitPct, request.IsActive);
         Items.Add(created);
         return Task.FromResult(created);
     }
@@ -68,7 +68,8 @@ public sealed class DemoMasterDataRepository : IMasterDataRepository
             throw new InvalidOperationException($"Item {itemId} was not found.");
         }
 
-        var updated = new ItemDto(itemId, request.Code, request.NameMk, request.GroupName, request.SalesPrice, request.WasteLimitPct, request.IsActive);
+        var existing = Items[index];
+        var updated = new ItemDto(itemId, request.Code, request.NameMk, existing.GroupCode, request.GroupName, request.SalesPrice, request.WasteLimitPct, request.IsActive);
         Items[index] = updated;
         return Task.FromResult(updated);
     }

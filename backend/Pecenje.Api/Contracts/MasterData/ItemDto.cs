@@ -4,6 +4,7 @@ public sealed record ItemDto(
     int ItemId,
     string Code,
     string NameMk,
+    string GroupCode,
     string GroupName,
     decimal SalesPrice,
     decimal WasteLimitPct,

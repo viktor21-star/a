@@ -23,7 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlanningRepository, DemoPlanningRepository>();
         services.AddScoped<IProductionRepository, DemoProductionRepository>();
         services.AddScoped<IAnalyticsRepository, DemoAnalyticsRepository>();
-        services.AddScoped<IMasterDataRepository, DemoMasterDataRepository>();
+        services.AddScoped<IMasterDataRepository, SqlServerMasterDataRepository>();
         services.AddScoped<ISourceMasterDataReader, SqlServerSourceMasterDataReader>();
         services.AddScoped<IUserAccessRepository, DemoUserAccessRepository>();
         services.AddScoped<DashboardAppService>();

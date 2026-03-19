@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
 import { useExportPlanVsActualExcel, useExportPlanVsActualPdf, usePlanVsActualReport } from "../lib/queries";
@@ -11,11 +11,27 @@ const reports = [
   "Отпад по локација"
 ];
 
+const OPERATOR_STORAGE_KEY = "pecenje-operator-entries";
+
+type StoredOperatorEntry = {
+  id: string;
+  mode: "pekara" | "pecenjara" | "pijara";
+  locationName?: string;
+  createdAt: string;
+  items: Array<{
+    itemName: string;
+    quantity: number;
+    classB?: boolean;
+    classBQuantity?: number;
+  }>;
+};
+
 export function ReportsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = usePlanVsActualReport();
   const exportExcel = useExportPlanVsActualExcel();
   const exportPdf = useExportPlanVsActualPdf();
+  const [operatorEntries, setOperatorEntries] = useState<StoredOperatorEntry[]>([]);
 
   useEffect(() => {
     if (exportExcel.data?.data) {
@@ -37,6 +53,21 @@ export function ReportsPage() {
     }
   }, [exportPdf.data]);
 
+  useEffect(() => {
+    const raw = window.localStorage.getItem(OPERATOR_STORAGE_KEY);
+    if (!raw) {
+      setOperatorEntries([]);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as StoredOperatorEntry[];
+      setOperatorEntries(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setOperatorEntries([]);
+    }
+  }, []);
+
   const bakedSummary = useMemo(() => {
     if (!data?.data) {
       return [];
@@ -46,6 +77,27 @@ export function ReportsPage() {
       .sort((left, right) => right.bakedQty - left.bakedQty)
       .slice(0, 4);
   }, [data]);
+
+  const pijaraReport = useMemo(() => {
+    const pijaraEntries = operatorEntries.filter((entry) => entry.mode === "pijara");
+    const rows = pijaraEntries.flatMap((entry) =>
+      (entry.items ?? []).map((item) => ({
+        id: `${entry.id}-${item.itemName}`,
+        createdAt: entry.createdAt,
+        locationName: entry.locationName ?? "Непозната локација",
+        itemName: item.itemName,
+        quantity: item.quantity,
+        classBQuantity: item.classB ? item.classBQuantity ?? 0 : 0
+      }))
+    );
+
+    return {
+      totalEntries: pijaraEntries.length,
+      totalItems: rows.reduce((sum, row) => sum + row.quantity, 0),
+      totalClassB: rows.reduce((sum, row) => sum + row.classBQuantity, 0),
+      rows
+    };
+  }, [operatorEntries]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Извештаите се достапни само за администратор." />;
@@ -81,6 +133,10 @@ export function ReportsPage() {
         <article className="admin-stat-tile">
           <span>Реализација</span>
           <strong>{data.data.totals.realizationPct}%</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Пијара · Класа Б</span>
+          <strong>{pijaraReport.totalClassB}</strong>
         </article>
       </section>
 
@@ -149,6 +205,44 @@ export function ReportsPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Пијара · Класа Б извештај</h3>
+        </div>
+
+        <div className="admin-summary-grid">
+          <article className="admin-stat-tile">
+            <span>Пријави</span>
+            <strong>{pijaraReport.totalEntries}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Вкупна количина</span>
+            <strong>{pijaraReport.totalItems}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Вкупно Класа Б</span>
+            <strong>{pijaraReport.totalClassB}</strong>
+          </article>
+        </div>
+
+        {pijaraReport.rows.length === 0 ? (
+          <div className="list-card">Сè уште нема пријави за Пијара.</div>
+        ) : (
+          <div className="report-table">
+            {pijaraReport.rows.map((row) => (
+              <div className="report-row" key={row.id}>
+                <strong>{row.locationName}</strong>
+                <span>{row.itemName}</span>
+                <span>Количина {row.quantity}</span>
+                <span>Класа Б {row.classBQuantity}</span>
+                <span>{row.createdAt}</span>
+                <span>{row.classBQuantity > 0 ? "Пријавено" : "Без Класа Б"}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </section>
   );
