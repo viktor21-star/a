@@ -67,6 +67,21 @@ public sealed class LocalAppDb
                 PRIMARY KEY (EntryId, ItemIndex)
             );
 
+            CREATE TABLE IF NOT EXISTS WasteEntries (
+                WasteEntryId INTEGER PRIMARY KEY AUTOINCREMENT,
+                LocationId INTEGER NOT NULL,
+                ItemName TEXT NOT NULL,
+                Quantity REAL NOT NULL,
+                Reason TEXT NOT NULL,
+                LocationName TEXT NOT NULL,
+                SourceMode TEXT NOT NULL,
+                Note TEXT NOT NULL,
+                PhotoDataUrl TEXT NOT NULL,
+                PhotoName TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                OperatorName TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS LocationOvens (
                 LocationId INTEGER PRIMARY KEY,
                 PekaraOvenType TEXT NOT NULL,

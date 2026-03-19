@@ -76,6 +76,7 @@ export const api = {
   getOperatorEntries: <T>() => request<T>("/batches/entries"),
   createOperatorEntry: <T>(body: unknown) => send<T>("/batches/entries", "POST", body),
   getWaste: <T>() => request<T>("/waste"),
+  createWaste: <T>(body: unknown) => send<T>("/waste", "POST", body),
   getAlerts: <T>() => request<T>("/alerts"),
   getPlanVsActual: <T>() => request<T>("/reports/plan-vs-actual"),
   exportPlanVsActualExcel: <T>() => request<T>("/reports/plan-vs-actual/export/excel"),

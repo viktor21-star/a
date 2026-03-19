@@ -1,19 +1,19 @@
 using Pecenje.Api.Application.Abstractions;
 using Pecenje.Api.Contracts.Users;
 using Pecenje.Api.Infrastructure.Demo;
-using Pecenje.Api.Infrastructure.SqlServer;
+using Pecenje.Api.Infrastructure.Sqlite;
 
 namespace Pecenje.Api.Infrastructure.UserAccess;
 
 public sealed class HybridUserAccessRepository(
-    SqlServerUserAccessRepository sqlRepository,
+    SqliteUserAccessRepository sqliteRepository,
     DemoUserAccessRepository demoRepository) : IUserAccessRepository
 {
     public async Task<IReadOnlyList<UserSummaryDto>> GetUsersAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var users = await sqlRepository.GetUsersAsync(cancellationToken);
+            var users = await sqliteRepository.GetUsersAsync(cancellationToken);
             if (users.Count > 0)
             {
                 return users;
@@ -30,7 +30,7 @@ public sealed class HybridUserAccessRepository(
     {
         try
         {
-            return await sqlRepository.CreateUserAsync(request, cancellationToken);
+            return await sqliteRepository.CreateUserAsync(request, cancellationToken);
         }
         catch
         {
@@ -42,7 +42,7 @@ public sealed class HybridUserAccessRepository(
     {
         try
         {
-            return await sqlRepository.UpdateUserAccountAsync(userId, request, cancellationToken);
+            return await sqliteRepository.UpdateUserAccountAsync(userId, request, cancellationToken);
         }
         catch
         {
@@ -54,7 +54,7 @@ public sealed class HybridUserAccessRepository(
     {
         try
         {
-            var locations = await sqlRepository.GetUserLocationsAsync(userId, cancellationToken);
+            var locations = await sqliteRepository.GetUserLocationsAsync(userId, cancellationToken);
             if (locations.Count > 0)
             {
                 return locations;
@@ -71,7 +71,7 @@ public sealed class HybridUserAccessRepository(
     {
         try
         {
-            return await sqlRepository.UpdateUserLocationsAsync(userId, request, cancellationToken);
+            return await sqliteRepository.UpdateUserLocationsAsync(userId, request, cancellationToken);
         }
         catch
         {
@@ -83,7 +83,7 @@ public sealed class HybridUserAccessRepository(
     {
         try
         {
-            var authenticated = await sqlRepository.AuthenticateAsync(username, password, cancellationToken);
+            var authenticated = await sqliteRepository.AuthenticateAsync(username, password, cancellationToken);
             if (authenticated is not null)
             {
                 return authenticated;

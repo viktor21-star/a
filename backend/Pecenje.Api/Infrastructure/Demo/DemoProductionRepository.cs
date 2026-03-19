@@ -7,7 +7,8 @@ namespace Pecenje.Api.Infrastructure.Demo;
 
 public sealed class DemoProductionRepository(
     DemoDataService demoDataService,
-    InMemoryOperatorEntryStore operatorEntryStore) : IProductionRepository
+    InMemoryOperatorEntryStore operatorEntryStore,
+    InMemoryWasteStore wasteStore) : IProductionRepository
 {
     public Task<IReadOnlyList<BatchDetailDto>> GetActiveBatchesAsync(CancellationToken cancellationToken = default)
     {
@@ -16,7 +17,25 @@ public sealed class DemoProductionRepository(
 
     public Task<IReadOnlyList<WasteSummaryDto>> GetRecentWasteAsync(CancellationToken cancellationToken = default)
     {
+        try
+        {
+            var local = wasteStore.GetAll();
+            if (local.Count > 0)
+            {
+                return Task.FromResult<IReadOnlyList<WasteSummaryDto>>(local);
+            }
+        }
+        catch
+        {
+            // Fall back to demo rows if local persistence is unavailable.
+        }
+
         return Task.FromResult(demoDataService.GetWasteEntries());
+    }
+
+    public Task<WasteSummaryDto> CreateWasteEntryAsync(CreateWasteEntryRequest request, string operatorName, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(wasteStore.Add(request, operatorName));
     }
 
     public Task<IReadOnlyList<OperatorEntryDto>> GetOperatorEntriesAsync(CancellationToken cancellationToken = default)

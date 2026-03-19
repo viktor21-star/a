@@ -25,6 +25,20 @@ public sealed class ProductionAppService(
         return waste.Where(x => allowedLocationIds.Contains(x.LocationId)).ToList();
     }
 
+    public async Task<WasteSummaryDto> CreateWasteAsync(CreateWasteEntryRequest request, CancellationToken cancellationToken = default)
+    {
+        await locationAccessAppService.EnsureLocationAccessAsync(
+            request.LocationId,
+            permission => permission.CanRecordWaste && HasWasteModePermission(permission, request.SourceMode),
+            "Корисникот нема дозвола да пријавува отпад за оваа локација и модул.",
+            cancellationToken);
+
+        var userId = currentUserProvider.GetCurrentUserId();
+        var users = await userAccessRepository.GetUsersAsync(cancellationToken);
+        var operatorName = users.FirstOrDefault((entry) => entry.UserId == userId)?.FullName ?? $"Корисник {userId}";
+        return await productionRepository.CreateWasteEntryAsync(request, operatorName, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<OperatorEntryDto>> GetOperatorEntriesAsync(CancellationToken cancellationToken = default)
     {
         var allowedLocationIds = await locationAccessAppService.GetAllowedLocationIdsAsync(cancellationToken);
@@ -53,6 +67,17 @@ public sealed class ProductionAppService(
             "pekara" => permission.CanBake && permission.CanUsePekara,
             "pecenjara" => permission.CanBake && permission.CanUsePecenjara,
             "pijara" => permission.CanBake && permission.CanUsePijara,
+            _ => false
+        };
+    }
+
+    private static bool HasWasteModePermission(UserLocationPermissionDto permission, string mode)
+    {
+        return mode switch
+        {
+            "pekara" => permission.CanUsePekara,
+            "pecenjara" => permission.CanUsePecenjara,
+            "pijara" => permission.CanUsePijara,
             _ => false
         };
     }

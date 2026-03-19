@@ -22,6 +22,12 @@ const adminModules = [
     imageClass: "home-card--alerts"
   },
   {
+    title: "Отпад",
+    description: "Преглед на отпад по локација, артикал, количина и причина.",
+    path: "/waste",
+    imageClass: "home-card--waste"
+  },
+  {
     title: "Извештаи",
     description: "Извештаи за испечено, реализација и export.",
     path: "/reports",
@@ -71,12 +77,13 @@ export function HomePage() {
     ? {
         pekara: activePermission.canBake && activePermission.canUsePekara,
         pecenjara: activePermission.canBake && activePermission.canUsePecenjara,
-        pijara: activePermission.canBake && activePermission.canUsePijara
+        pijara: activePermission.canBake && activePermission.canUsePijara,
+        waste: activePermission.canRecordWaste
       }
-    : { pekara: false, pecenjara: false, pijara: false };
+    : { pekara: false, pecenjara: false, pijara: false, waste: false };
 
   if (!isAdministrator(user)) {
-    if (!operatorAccess.pekara && !operatorAccess.pecenjara && !operatorAccess.pijara) {
+    if (!operatorAccess.pekara && !operatorAccess.pecenjara && !operatorAccess.pijara && !operatorAccess.waste) {
       return <PageState message="Операторот нема доделени модули за избраната работна локација." />;
     }
 
@@ -138,6 +145,23 @@ export function HomePage() {
               <div className="home-card-copy">
                 <strong>Пијара</strong>
                 <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
+              </div>
+            </button>
+          )}
+
+          {operatorAccess.waste && (
+            <button
+              type="button"
+              className="operator-home-card home-card-visual home-card--waste"
+              onClick={() => {
+                window.location.href = "/production?mode=waste";
+              }}
+            >
+              <span className="home-card-number">04</span>
+              <span className="home-card-badge">Оператор</span>
+              <div className="home-card-copy">
+                <strong>Отпад</strong>
+                <span>Пријава на отпад со избор од кој дел е отпадот, артикал, причина и слика.</span>
               </div>
             </button>
           )}

@@ -3,6 +3,7 @@ using Pecenje.Api.Application.Services;
 using Pecenje.Api.Infrastructure.Demo;
 using Pecenje.Api.Infrastructure.Sqlite;
 using Pecenje.Api.Infrastructure.SqlServer;
+using Pecenje.Api.Infrastructure.UserAccess;
 using Pecenje.Api.Infrastructure.Web;
 using Pecenje.Api.Services;
 
@@ -17,9 +18,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<DemoDataService>();
         services.AddSingleton<InMemoryManualPlanningStore>();
         services.AddSingleton<InMemoryOperatorEntryStore>();
+        services.AddSingleton<InMemoryWasteStore>();
         services.AddSingleton<InMemoryLocationOvenStore>();
         services.AddSingleton<InMemoryTermStore>();
         services.AddSingleton<InMemoryReasonStore>();
+        services.AddScoped<DemoUserAccessRepository>();
         services.AddScoped<SqliteUserAccessRepository>();
         services.AddScoped<IAuthService, DemoAuthService>();
         services.AddScoped<IAuditService, DemoAuditService>();
@@ -33,7 +36,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnalyticsRepository, DemoAnalyticsRepository>();
         services.AddScoped<IMasterDataRepository, SqlServerMasterDataRepository>();
         services.AddScoped<ISourceMasterDataReader, SqlServerSourceMasterDataReader>();
-        services.AddScoped<IUserAccessRepository, SqliteUserAccessRepository>();
+        services.AddScoped<IUserAccessRepository, HybridUserAccessRepository>();
         services.AddScoped<DashboardAppService>();
         services.AddScoped<PlanningAppService>();
         services.AddScoped<ProductionAppService>();

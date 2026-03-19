@@ -93,6 +93,19 @@ export type CreateOperatorEntryRequest = {
   createdAt: string;
 };
 
+export type CreateWasteEntryRequest = {
+  sourceMode: "pekara" | "pecenjara" | "pijara";
+  locationId: number;
+  locationName: string;
+  itemName: string;
+  quantity: number;
+  reason: string;
+  note: string;
+  photoDataUrl: string;
+  photoName: string;
+  createdAt: string;
+};
+
 export type WasteEntry = {
   wasteEntryId: number;
   locationId: number;
@@ -100,6 +113,12 @@ export type WasteEntry = {
   quantity: number;
   reason: string;
   locationName: string;
+  sourceMode: "pekara" | "pecenjara" | "pijara";
+  note: string;
+  photoDataUrl: string;
+  photoName: string;
+  createdAt: string;
+  operatorName: string;
 };
 
 export type Alert = {

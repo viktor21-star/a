@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useBatches, useCreateOperatorEntry, useItems, usePlans, useUserLocations, useWasteEntries } from "../lib/queries";
+import { useBatches, useCreateOperatorEntry, useCreateWasteEntry, useItems, usePlans, useReasons, useUserLocations, useWasteEntries } from "../lib/queries";
 import { createLocalId, queuePendingOperatorEntry, shouldQueueOffline } from "../lib/operatorEntryQueue";
-import type { CreateOperatorEntryRequest, Item, OperatorEntryLine } from "../lib/types";
+import type { CreateOperatorEntryRequest, CreateWasteEntryRequest, Item, OperatorEntryLine } from "../lib/types";
 
-type EntryMode = "pekara" | "pecenjara" | "pijara";
+type ItemMode = "pekara" | "pecenjara" | "pijara";
+type EntryMode = ItemMode | "waste";
 
 export function ProductionPage() {
   const { user } = useAuth();
@@ -13,7 +14,9 @@ export function ProductionPage() {
   const wasteQuery = useWasteEntries();
   const itemsQuery = useItems();
   const plansQuery = usePlans();
+  const reasonsQuery = useReasons();
   const createEntryMutation = useCreateOperatorEntry();
+  const createWasteMutation = useCreateWasteEntry();
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [draft, setDraft] = useState({ note: "", photoDataUrl: "", photoName: "" });
@@ -21,6 +24,11 @@ export function ProductionPage() {
     { itemName: "", quantity: 10, classB: true, classBQuantity: 10 }
   ]);
   const [itemSearch, setItemSearch] = useState<string[]>([""]);
+  const [wasteSource, setWasteSource] = useState<ItemMode | null>(null);
+  const [wasteItemSearch, setWasteItemSearch] = useState("");
+  const [wasteItemName, setWasteItemName] = useState("");
+  const [wasteQuantity, setWasteQuantity] = useState(1);
+  const [wasteReason, setWasteReason] = useState("");
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
@@ -33,18 +41,20 @@ export function ProductionPage() {
   const readyItems = draftItems.filter(
     (entry) => entry.itemName && entry.quantity > 0 && (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0)
   );
-  const availableItems = useMemo(() => filterItemsForMode(itemsQuery.data?.data ?? [], selectedMode), [itemsQuery.data, selectedMode]);
-  const assignedBakeLocations = useMemo(
-    () => (permissionsQuery.data?.data ?? []).filter((entry) => entry.canBake),
-    [permissionsQuery.data]
+  const effectiveItemMode = selectedMode === "waste" ? wasteSource : selectedMode;
+  const availableItems = useMemo(() => filterItemsForMode(itemsQuery.data?.data ?? [], effectiveItemMode), [itemsQuery.data, effectiveItemMode]);
+  const wasteReasons = useMemo(
+    () => (reasonsQuery.data?.data ?? []).filter((entry) => entry.isActive && entry.category === "отпад"),
+    [reasonsQuery.data]
   );
+  const assignedLocations = permissionsQuery.data?.data ?? [];
   const activeLocation = useMemo(() => {
-    if (!assignedBakeLocations.length) {
+    if (!assignedLocations.length) {
       return null;
     }
 
-    return assignedBakeLocations.find((entry) => entry.locationId === user?.defaultLocationId) ?? assignedBakeLocations[0];
-  }, [assignedBakeLocations, user?.defaultLocationId]);
+    return assignedLocations.find((entry) => entry.locationId === user?.defaultLocationId) ?? assignedLocations[0];
+  }, [assignedLocations, user?.defaultLocationId]);
 
   const modeAccess = useMemo(() => {
     const permission = activeLocation
@@ -54,7 +64,8 @@ export function ProductionPage() {
     return {
       pekara: Boolean(permission?.canBake && permission.canUsePekara),
       pecenjara: Boolean(permission?.canBake && permission.canUsePecenjara),
-      pijara: Boolean(permission?.canBake && permission.canUsePijara)
+      pijara: Boolean(permission?.canBake && permission.canUsePijara),
+      waste: Boolean(permission?.canRecordWaste)
     };
   }, [activeLocation, permissionsQuery.data]);
 
@@ -62,7 +73,7 @@ export function ProductionPage() {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
     if (
-      (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") &&
+      (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara" || requestedMode === "waste") &&
       modeAccess[requestedMode]
     ) {
       setSelectedMode(requestedMode);
@@ -88,10 +99,19 @@ export function ProductionPage() {
       return;
     }
 
+    if (modeAccess.waste) {
+      setSelectedMode("waste");
+      return;
+    }
+
     setSelectedMode(null);
   }, [modeAccess, selectedMode]);
 
   useEffect(() => {
+    if (selectedMode === "waste") {
+      return;
+    }
+
     const firstItem = availableItems[0]?.nameMk;
     if (firstItem && !draftItems[0]?.itemName) {
       setDraftItems((current) =>
@@ -101,12 +121,25 @@ export function ProductionPage() {
   }, [availableItems, draftItems]);
 
   useEffect(() => {
+    if (selectedMode === "waste") {
+      return;
+    }
+
     setItemSearch((current) =>
       draftItems.map((entry, index) => current[index] ?? entry.itemName ?? "")
     );
   }, [draftItems]);
 
   useEffect(() => {
+    if (selectedMode === "waste") {
+      const firstItem = availableItems[0]?.nameMk ?? "";
+      if (!wasteItemName || !availableItems.some((item) => item.nameMk === wasteItemName)) {
+        setWasteItemName(firstItem);
+        setWasteItemSearch(firstItem);
+      }
+      return;
+    }
+
     if (!availableItems.length) {
       return;
     }
@@ -139,27 +172,27 @@ export function ProductionPage() {
     return () => window.clearTimeout(timer);
   }, [saveConfirmation]);
 
-  if (permissionsQuery.isLoading || itemsQuery.isLoading || plansQuery.isLoading) {
+  if (permissionsQuery.isLoading || itemsQuery.isLoading || plansQuery.isLoading || reasonsQuery.isLoading) {
     return <PageState message="Се вчитуваат оперативните податоци..." />;
   }
 
-  if (permissionsQuery.isError || itemsQuery.isError || plansQuery.isError) {
+  if (permissionsQuery.isError || itemsQuery.isError || plansQuery.isError || reasonsQuery.isError) {
     return <PageState message="Не може да се вчита оперативниот модул." />;
   }
 
-  if (selectedMode && !availableItems.length) {
+  if (selectedMode && selectedMode !== "waste" && !availableItems.length) {
     return <PageState message="Нема активни артикли за избраниот модул." />;
   }
 
-  if (!modeAccess.pekara && !modeAccess.pecenjara && !modeAccess.pijara) {
-    return <PageState message="Корисникот нема дозвола за внес во Пекара, Печењара или Пијара." />;
+  if (!modeAccess.pekara && !modeAccess.pecenjara && !modeAccess.pijara && !modeAccess.waste) {
+    return <PageState message="Корисникот нема дозвола за внес во Пекара, Печењара, Пијара или Отпад." />;
   }
 
   if (!isAdministrator(user) && !activeLocation) {
-    return <PageState message="Операторот нема доделена работна локација за печење." />;
+    return <PageState message="Операторот нема доделена работна локација." />;
   }
 
-  const activePlan = !isAdministrator(user) && selectedMode && selectedMode !== "pijara"
+  const activePlan = !isAdministrator(user) && selectedMode && selectedMode !== "pijara" && selectedMode !== "waste"
     ? (plansQuery.data?.data ?? [])
         .filter((entry) => entry.mode === selectedMode && entry.locationId === activeLocation?.locationId)
         .sort((left, right) => left.termLabel.localeCompare(right.termLabel))
@@ -178,12 +211,14 @@ export function ProductionPage() {
                   ? "Печењара"
                   : selectedMode === "pijara"
                     ? "Пијара"
+                    : selectedMode === "waste"
+                      ? "Отпад"
                     : "Избери тип на внес"}
             </h3>
             <p className="meta">
               {selectedMode
                 ? "Овој модул е на цел екран. Со Назад се враќаш на двете големи кочки."
-                : "Операторот гледа Пекара, Печењара и Пијара. После изборот внесува артикли, количини и задолжителна слика."}
+                : "Операторот гледа Пекара, Печењара, Пијара и Отпад. После изборот внесува артикли, количини и задолжителна слика."}
             </p>
           </div>
           {selectedMode && (
@@ -233,10 +268,21 @@ export function ProductionPage() {
                 <span>Пријава на артикли што одат како Класа Б.</span>
               </button>
             )}
+
+            {modeAccess.waste && (
+              <button
+                type="button"
+                className="operator-mode-card"
+                onClick={() => setSelectedMode("waste")}
+              >
+                <strong>Отпад</strong>
+                <span>Пријава на отпад со избор од кој дел доаѓа отпадот.</span>
+              </button>
+            )}
           </section>
         )}
 
-        {selectedMode && (
+        {selectedMode && selectedMode !== "waste" && (
           <section className="panel operator-entry-panel">
             <div className="panel-header">
               <h3>
@@ -564,6 +610,228 @@ export function ProductionPage() {
             </div>
           </section>
         )}
+
+        {selectedMode === "waste" && (
+          <section className="panel operator-entry-panel">
+            <div className="panel-header">
+              <h3>Пријава на отпад</h3>
+            </div>
+
+            <div className="operator-explainer">
+              <strong>Како се пријавува отпад:</strong>
+              <span>Работна локација: {activeLocation?.locationName}</span>
+              <span>1. Избери од кој дел е отпадот: Пекара, Печењара или Пијара.</span>
+              <span>2. Сликај го отпадот. Една пријава е една слика.</span>
+              <span>3. Избери артикал. Ќе се прикажат само артиклите за избраниот дел.</span>
+              <span>4. Внеси количина и причина за отпад.</span>
+              <span>5. Сними. По успешно снимање ќе се вратиш на почетниот екран.</span>
+            </div>
+
+            {saveConfirmation && (
+              <div className="operator-success-banner">
+                <strong>Успешно снимено</strong>
+                <span>{saveConfirmation}</span>
+              </div>
+            )}
+
+            {saveError && <div className="form-error">{saveError}</div>}
+
+            <div className="operator-step-grid">
+              <article className={`operator-step-card${wasteSource ? " operator-step-card--done" : ""}`}>
+                <div className="operator-step-card__header">
+                  <span className="pill">Чекор 1</span>
+                  <strong>Избери од кој дел е отпадот</strong>
+                </div>
+                <div className="operator-mode-grid">
+                  {(["pekara", "pecenjara", "pijara"] as const)
+                    .filter((mode) => modeAccess[mode])
+                    .map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={`operator-mode-card${wasteSource === mode ? " operator-mode-card--active" : ""}`}
+                        onClick={() => {
+                          setWasteSource(mode);
+                          setWasteItemName("");
+                          setWasteItemSearch("");
+                        }}
+                      >
+                        <strong>{mode === "pekara" ? "Пекара" : mode === "pecenjara" ? "Печењара" : "Пијара"}</strong>
+                        <span>
+                          {mode === "pekara"
+                            ? "Отпад од пекарски производи."
+                            : mode === "pecenjara"
+                              ? "Отпад од печењара."
+                              : "Отпад од Пијара."}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </article>
+
+              {wasteSource && (
+                <article className={`operator-step-card${photoReady ? " operator-step-card--done" : ""}`}>
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 2</span>
+                    <strong>Сликај отпад</strong>
+                  </div>
+                  <label className="operator-photo-field">
+                    <span>Задолжителна слика од отпадот</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) {
+                          setDraft((current) => ({ ...current, photoDataUrl: "", photoName: "" }));
+                          return;
+                        }
+
+                        const photoDataUrl = await fileToDataUrl(file);
+                        setDraft((current) => ({
+                          ...current,
+                          photoDataUrl,
+                          photoName: file.name
+                        }));
+                      }}
+                    />
+                  </label>
+
+                  {draft.photoDataUrl && (
+                    <div className="operator-photo-preview">
+                      <img src={draft.photoDataUrl} alt="Слика од отпад" />
+                    </div>
+                  )}
+                </article>
+              )}
+
+              {wasteSource && photoReady && (
+                <article className={`operator-step-card${Boolean(wasteItemName) ? " operator-step-card--done" : ""}`}>
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 3</span>
+                    <strong>Избери артикал</strong>
+                  </div>
+                  {availableItems.length === 0 ? (
+                    <div className="list-card">Нема активни артикли за избраниот дел.</div>
+                  ) : (
+                    <>
+                  <input
+                    className="search-input"
+                    value={wasteItemSearch}
+                    placeholder="Пребарај по име или шифра"
+                    onChange={(event) => setWasteItemSearch(event.target.value)}
+                  />
+                  <select
+                    value={wasteItemName}
+                    onChange={(event) => setWasteItemName(event.target.value)}
+                  >
+                    {availableItems
+                      .filter((item) => {
+                        const query = wasteItemSearch.trim().toLowerCase();
+                        if (!query) {
+                          return true;
+                        }
+
+                        return [item.nameMk, item.code].some((value) => value.toLowerCase().includes(query));
+                      })
+                      .map((item) => (
+                        <option key={item.itemId} value={item.nameMk}>
+                          {item.code} · {item.nameMk}
+                        </option>
+                      ))}
+                  </select>
+                  <span className="meta">
+                    Артикал шифра: {availableItems.find((item) => item.nameMk === wasteItemName)?.code ?? "-"}
+                  </span>
+                    </>
+                  )}
+                </article>
+              )}
+
+              {wasteSource && photoReady && wasteItemName && (
+                <article className={`operator-step-card${wasteQuantity > 0 && Boolean(wasteReason) ? " operator-step-card--done" : ""}`}>
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 4</span>
+                    <strong>Количина и причина</strong>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={wasteQuantity}
+                    onChange={(event) => setWasteQuantity(Number(event.target.value))}
+                    placeholder="Количина"
+                  />
+                  <select value={wasteReason} onChange={(event) => setWasteReason(event.target.value)}>
+                    <option value="">Избери причина</option>
+                    {wasteReasons.map((entry) => (
+                      <option key={entry.id} value={entry.name}>
+                        {entry.code} · {entry.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={draft.note}
+                    onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
+                    placeholder="Забелешка"
+                  />
+                </article>
+              )}
+
+              {wasteSource && photoReady && wasteItemName && wasteQuantity > 0 && Boolean(wasteReason) && (
+                <article className="operator-step-card operator-step-card--done">
+                  <div className="operator-step-card__header">
+                    <span className="pill">Чекор 5</span>
+                    <strong>Сними отпад</strong>
+                  </div>
+                  <button
+                    className="action-button"
+                    type="button"
+                    onClick={() => {
+                      if (!wasteSource || !draft.photoDataUrl || !wasteItemName || !wasteReason || wasteQuantity <= 0) {
+                        return;
+                      }
+
+                      setSaveError(null);
+
+                      const request: CreateWasteEntryRequest = {
+                        sourceMode: wasteSource,
+                        locationId: activeLocation?.locationId ?? 0,
+                        locationName: activeLocation?.locationName ?? "Непозната локација",
+                        itemName: wasteItemName,
+                        quantity: wasteQuantity,
+                        reason: wasteReason,
+                        note: draft.note,
+                        photoDataUrl: draft.photoDataUrl,
+                        photoName: draft.photoName,
+                        createdAt: new Date().toISOString()
+                      };
+
+                      createWasteMutation.mutate(request, {
+                        onSuccess: () => {
+                          setDraft({ note: "", photoDataUrl: "", photoName: "" });
+                          setWasteSource(null);
+                          setWasteItemSearch("");
+                          setWasteItemName("");
+                          setWasteQuantity(1);
+                          setWasteReason("");
+                          triggerSuccessFeedback("Успешна пријава на отпад");
+                          setSaveConfirmation(`Отпад · ${request.locationName} · ${request.itemName}`);
+                        },
+                        onError: () => {
+                          setSaveError("Неуспешна пријава на отпад. Провери дали интернетот и серверот работат, па пробај повторно. Ако проблемот остане, контактирај администратор.");
+                          triggerErrorFeedback("Неуспешна пријава на отпад");
+                        }
+                      });
+                    }}
+                  >
+                    {createWasteMutation.isPending ? "Се снима..." : "Сними отпад"}
+                  </button>
+                </article>
+              )}
+            </div>
+          </section>
+        )}
       </section>
     );
   }
@@ -618,7 +886,7 @@ export function ProductionPage() {
   );
 }
 
-function filterItemsForMode(items: Item[], mode: EntryMode | null) {
+function filterItemsForMode(items: Item[], mode: ItemMode | null) {
   if (!mode) {
     return items;
   }
@@ -626,7 +894,7 @@ function filterItemsForMode(items: Item[], mode: EntryMode | null) {
   return items.filter((item) => matchesMode(item, mode));
 }
 
-function matchesMode(item: Item, mode: EntryMode) {
+function matchesMode(item: Item, mode: ItemMode) {
   const groupCode = item.groupCode?.trim();
 
   if (mode === "pekara") {

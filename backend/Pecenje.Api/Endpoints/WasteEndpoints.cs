@@ -13,7 +13,11 @@ public static class WasteEndpoints
         group.MapGet("/", async (ProductionAppService appService, CancellationToken cancellationToken) => Results.Ok(
             new ApiEnvelope<IReadOnlyList<WasteSummaryDto>>(await appService.GetWasteAsync(cancellationToken))));
 
-        group.MapPost("/", () => Results.Created("/api/v1/waste/81", new { wasteEntryId = 81 }));
+        group.MapPost("/", async (CreateWasteEntryRequest request, ProductionAppService appService, CancellationToken cancellationToken) =>
+        {
+            var created = await appService.CreateWasteAsync(request, cancellationToken);
+            return Results.Created($"/api/v1/waste/{created.WasteEntryId}", new ApiEnvelope<WasteSummaryDto>(created));
+        });
 
         return app;
     }

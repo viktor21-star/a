@@ -16,6 +16,7 @@ import { HomePage } from "./pages/HomePage";
 import { VersionPolicyPage } from "./pages/VersionPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ReasonsPage } from "./pages/ReasonsPage";
+import { WastePage } from "./pages/WastePage";
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ export function App() {
         <Route path="planning" element={<PlanningPage />} />
         <Route path="production" element={<ProductionPage />} />
         <Route path="alerts" element={<AlertsPage />} />
+        <Route path="waste" element={<WastePage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="master-data" element={<MasterDataPage />} />
         <Route path="master-data/locations" element={<LocationsPage />} />

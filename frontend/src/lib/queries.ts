@@ -8,6 +8,7 @@ import type {
   BatchDetail,
   CreateManualPlanRequest,
   CreateOperatorEntryRequest,
+  CreateWasteEntryRequest,
   CreateUserRequest,
   DashboardOverview,
   Item,
@@ -103,6 +104,17 @@ export function useWasteEntries() {
   return useQuery({
     queryKey: ["waste"],
     queryFn: () => api.getWaste<ApiEnvelope<WasteEntry[]>>()
+  });
+}
+
+export function useCreateWasteEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateWasteEntryRequest) => api.createWaste<ApiEnvelope<WasteEntry>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["waste"] });
+    }
   });
 }
 

@@ -8,6 +8,7 @@
 ## Enterprise документација
 
 - архитектура: [docs/enterprise-architecture.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/enterprise-architecture.md)
+- корисничко упатство: [docs/upatstvo-za-koristenje.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/upatstvo-za-koristenje.md)
 - база: [docs/database-schema.sql](/home/zitomarketi/Desktop/Pecenje%20app/docs/database-schema.sql)
 - API: [docs/api-spec.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/api-spec.md)
 - UI екрани: [docs/ui-screens.md](/home/zitomarketi/Desktop/Pecenje%20app/docs/ui-screens.md)

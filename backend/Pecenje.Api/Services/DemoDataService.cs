@@ -62,8 +62,8 @@ public sealed class DemoDataService
     {
         return new[]
         {
-            new WasteSummaryDto(81, 2, "Лиснато тесто", 4, "препечено", "Центар"),
-            new WasteSummaryDto(82, 1, "Кроасан", 3, "нераспродадено", "Аеродром 1")
+            new WasteSummaryDto(81, 2, "Лиснато тесто", 4, "препечено", "Центар", "pekara", "", "", "", DateTime.Now.AddHours(-2).ToString("s"), "Оператор Центар"),
+            new WasteSummaryDto(82, 1, "Кроасан", 3, "нераспродадено", "Аеродром 1", "pijara", "", "", "", DateTime.Now.AddHours(-1).ToString("s"), "Оператор Аеродром")
         };
     }
 
