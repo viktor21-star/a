@@ -8,6 +8,9 @@ on:
       - "frontend/**"
       - ".github/workflows/android-release.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build-signed-release:
     runs-on: ubuntu-latest
