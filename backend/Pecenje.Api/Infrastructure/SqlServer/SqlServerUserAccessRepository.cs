@@ -24,11 +24,12 @@ public sealed class SqlServerUserAccessRepository(IAppSqlConnectionFactory conne
             UserAccessSql.CreateUser,
             new
             {
+                request.DefaultLocationId,
                 request.Username,
                 request.FullName,
                 request.RoleCode,
                 request.IsActive,
-                PasswordHash = "DEMO-PASSWORD-HASH"
+                PasswordHash = request.Password
             },
             cancellationToken: cancellationToken));
 

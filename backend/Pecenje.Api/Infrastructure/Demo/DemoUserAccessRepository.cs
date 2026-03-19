@@ -5,6 +5,23 @@ namespace Pecenje.Api.Infrastructure.Demo;
 
 public sealed class DemoUserAccessRepository : IUserAccessRepository
 {
+    public sealed record DemoAuthMatch(
+        long UserId,
+        string Username,
+        string Password,
+        string FullName,
+        string RoleCode,
+        int? DefaultLocationId,
+        IReadOnlyList<UserLocationPermissionDto> Locations);
+
+    private sealed record DemoUserCredential(
+        long UserId,
+        string Username,
+        string Password,
+        string FullName,
+        string RoleCode,
+        int? DefaultLocationId);
+
     private static readonly List<UserSummaryDto> Users =
     [
         new UserSummaryDto(1, "admin", "Администратор", "administrator", true),
@@ -12,21 +29,36 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
         new UserSummaryDto(3, "sef.centar", "Шеф Центар", "market_manager", true)
     ];
 
+    private static readonly Dictionary<string, DemoUserCredential> CredentialsByUsername = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["admin"] = new DemoUserCredential(1, "admin", "1234", "Администратор", "administrator", 1),
+        ["operator"] = new DemoUserCredential(2, "operator", "1111", "Оператор Аеродром 1", "operator", 1),
+        ["manager"] = new DemoUserCredential(3, "manager", "2222", "Шеф Центар", "market_manager", 2),
+        ["pekara.aer1"] = new DemoUserCredential(2, "pekara.aer1", "1111", "Пекар Аеродром 1", "operator", 1),
+        ["sef.centar"] = new DemoUserCredential(3, "sef.centar", "2222", "Шеф Центар", "market_manager", 2)
+    };
+
     private static readonly Dictionary<long, List<UserLocationPermissionDto>> PermissionsByUser = new()
     {
         [1] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", true, true, true, true, true, true, true, "Ротациона"),
-            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, "Камена")
+            new UserLocationPermissionDto(1, "Аеродром 1", true, true, true, true, true, true, true, true, "Ротациона", "Комбинирана"),
+            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, true, "Камена", "Ротациона")
         ],
         [2] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", false, true, true, false, false, true, false, "Ротациона")
+            new UserLocationPermissionDto(1, "Аеродром 1", false, true, true, false, false, true, false, false, "Ротациона", "Нема")
         ],
         [3] =
         [
-            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, "Комбинирана")
+            new UserLocationPermissionDto(2, "Центар", true, true, true, true, true, true, true, true, "Комбинирана", "Камена")
         ]
+    };
+
+    private static readonly Dictionary<int, string> LocationNames = new()
+    {
+        [1] = "Аеродром 1",
+        [2] = "Центар"
     };
 
     public Task<IReadOnlyList<UserSummaryDto>> GetUsersAsync(CancellationToken cancellationToken = default)
@@ -40,10 +72,29 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
         var user = new UserSummaryDto(nextId, request.Username, request.FullName, request.RoleCode, request.IsActive);
 
         Users.Add(user);
+        CredentialsByUsername[request.Username] = new DemoUserCredential(
+            nextId,
+            request.Username,
+            request.Password,
+            request.FullName,
+            request.RoleCode,
+            request.DefaultLocationId);
+
         PermissionsByUser[nextId] =
         [
-            new UserLocationPermissionDto(1, "Аеродром 1", false, false, false, false, false, false, false, "Нема"),
-            new UserLocationPermissionDto(2, "Центар", false, false, false, false, false, false, false, "Нема")
+            new UserLocationPermissionDto(
+                request.DefaultLocationId,
+                GetLocationName(request.DefaultLocationId),
+                request.RoleCode is "administrator" or "market_manager",
+                request.CanUsePekara || request.CanUsePecenjara || request.CanUsePijara,
+                request.RoleCode is "administrator" or "market_manager",
+                request.RoleCode is "administrator" or "market_manager",
+                request.RoleCode == "administrator",
+                request.CanUsePekara,
+                request.CanUsePecenjara,
+                request.CanUsePijara,
+                request.PekaraOvenType,
+                request.PecenjaraOvenType)
         ];
 
         return Task.FromResult(user);
@@ -60,4 +111,27 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
         PermissionsByUser[userId] = request.Locations.ToList();
         return Task.FromResult<IReadOnlyList<UserLocationPermissionDto>>(request.Locations);
     }
+
+    public static bool TryAuthenticate(string username, string password, out DemoAuthMatch? result)
+    {
+        if (CredentialsByUsername.TryGetValue(username, out var user) && user.Password == password)
+        {
+            PermissionsByUser.TryGetValue(user.UserId, out var locations);
+            result = new DemoAuthMatch(
+                user.UserId,
+                user.Username,
+                user.Password,
+                user.FullName,
+                user.RoleCode,
+                user.DefaultLocationId,
+                locations?.ToArray() ?? []);
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+
+    private static string GetLocationName(int locationId)
+        => LocationNames.TryGetValue(locationId, out var locationName) ? locationName : $"Локација {locationId}";
 }

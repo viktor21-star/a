@@ -13,7 +13,9 @@ export function VersionGate({ children }: PropsWithChildren) {
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const policy = versionQuery.data?.data ?? null;
   const needsForceUpdate = policy
-    ? policy.forceUpdate || compareVersions(APP_VERSION, policy.minimumSupportedVersion) < 0
+    ? policy.forceUpdate ||
+      compareVersions(APP_VERSION, policy.latestVersion) !== 0 ||
+      String(APP_BUILD) !== String(policy.buildNumber)
     : false;
 
   useEffect(() => {

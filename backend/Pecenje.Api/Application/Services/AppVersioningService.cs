@@ -1,11 +1,15 @@
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Pecenje.Api.Configuration;
 using Pecenje.Api.Contracts.Versioning;
 using Pecenje.Api.Services;
 
 namespace Pecenje.Api.Application.Services;
 
-public sealed class AppVersioningService(IOptions<AppVersioningOptions> options, IServiceScopeFactory serviceScopeFactory)
+public sealed class AppVersioningService(
+    IOptions<AppVersioningOptions> options,
+    IServiceScopeFactory serviceScopeFactory,
+    ILogger<AppVersioningService> logger)
 {
     private readonly object syncRoot = new();
     private AppVersionPolicyDto current = new(
@@ -43,9 +47,17 @@ public sealed class AppVersioningService(IOptions<AppVersioningOptions> options,
             current = next;
         }
 
-        using var scope = serviceScopeFactory.CreateScope();
-        var auditService = scope.ServiceProvider.GetRequiredService<IAuditService>();
-        await auditService.LogAsync("AppVersionPolicy", "update", "singleton", request, cancellationToken);
+        try
+        {
+            using var scope = serviceScopeFactory.CreateScope();
+            var auditService = scope.ServiceProvider.GetRequiredService<IAuditService>();
+            await auditService.LogAsync("AppVersionPolicy", "update", "singleton", request, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to write audit log for app version policy update.");
+        }
+
         return next;
     }
 }

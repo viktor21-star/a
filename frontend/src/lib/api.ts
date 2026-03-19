@@ -1,8 +1,18 @@
-const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081/api/v1";
+const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.11.40:8081/api/v1";
 const API_BASE_STORAGE_KEY = "pecenje-api-base-url";
 
 export function getApiBaseUrl() {
-  return window.localStorage.getItem(API_BASE_STORAGE_KEY) ?? DEFAULT_API_BASE;
+  const stored = window.localStorage.getItem(API_BASE_STORAGE_KEY);
+  if (!stored) {
+    return DEFAULT_API_BASE;
+  }
+
+  if (stored.includes("127.0.0.1:8081") || stored.includes("localhost:8081")) {
+    window.localStorage.setItem(API_BASE_STORAGE_KEY, DEFAULT_API_BASE);
+    return DEFAULT_API_BASE;
+  }
+
+  return stored;
 }
 
 export function setApiBaseUrl(url: string) {

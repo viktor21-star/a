@@ -1,5 +1,6 @@
-import { Navigate } from "react-router-dom";
-import { isAdministrator, useAuth } from "../lib/auth";
+import { isAdministrator, isOperator, useAuth } from "../lib/auth";
+import { PageState } from "../components/PageState";
+import { useUserLocations } from "../lib/queries";
 
 const adminModules = [
   {
@@ -46,51 +47,80 @@ const adminModules = [
 
 export function HomePage() {
   const { user } = useAuth();
+  const permissionsQuery = useUserLocations(user?.id ?? null);
+
+  if (isOperator(user) && permissionsQuery.isLoading) {
+    return <PageState message="Се вчитуваат операторските привилегии..." />;
+  }
+
+  const activePermission = !isAdministrator(user)
+    ? (permissionsQuery.data?.data ?? []).find((entry) => entry.locationId === user?.defaultLocationId)
+      ?? (permissionsQuery.data?.data ?? [])[0]
+      ?? null
+    : null;
+
+  const operatorAccess = activePermission
+    ? {
+        pekara: activePermission.canBake && activePermission.canUsePekara,
+        pecenjara: activePermission.canBake && activePermission.canUsePecenjara,
+        pijara: activePermission.canBake && activePermission.canUsePijara
+      }
+    : { pekara: false, pecenjara: false, pijara: false };
 
   if (!isAdministrator(user)) {
+    if (!operatorAccess.pekara && !operatorAccess.pecenjara && !operatorAccess.pijara) {
+      return <PageState message="Операторот нема доделени модули за избраната работна локација." />;
+    }
+
     return (
       <section className="page-grid">
         <header className="page-header">
           <div>
             <p className="topbar-eyebrow">Оператор</p>
             <h3>Избери дел за внес</h3>
-            <p className="meta">Операторот работи со три големи кочки: Пекара, Печењара и Пијара.</p>
+            <p className="meta">Се прикажуваат само модулите што се дозволени за работната локација на операторот.</p>
           </div>
         </header>
 
         <section className="operator-home-grid">
-          <button
-            type="button"
-            className="operator-home-card"
-            onClick={() => {
-              window.location.href = "/production?mode=pekara";
-            }}
-          >
-            <strong>Пекара</strong>
-            <span>Леб, печива, бурек, кифли и останати производи од пекара.</span>
-          </button>
+          {operatorAccess.pekara && (
+            <button
+              type="button"
+              className="operator-home-card"
+              onClick={() => {
+                window.location.href = "/production?mode=pekara";
+              }}
+            >
+              <strong>Пекара</strong>
+              <span>Леб, печива, бурек, кифли и останати производи од пекара.</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            className="operator-home-card"
-            onClick={() => {
-              window.location.href = "/production?mode=pecenjara";
-            }}
-          >
-            <strong>Печењара</strong>
-            <span>Пилешко, месо и производи што се водат преку печењара.</span>
-          </button>
+          {operatorAccess.pecenjara && (
+            <button
+              type="button"
+              className="operator-home-card"
+              onClick={() => {
+                window.location.href = "/production?mode=pecenjara";
+              }}
+            >
+              <strong>Печењара</strong>
+              <span>Пилешко, месо и производи што се водат преку печењара.</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            className="operator-home-card"
-            onClick={() => {
-              window.location.href = "/production?mode=pijara";
-            }}
-          >
-            <strong>Пијара</strong>
-            <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
-          </button>
+          {operatorAccess.pijara && (
+            <button
+              type="button"
+              className="operator-home-card"
+              onClick={() => {
+                window.location.href = "/production?mode=pijara";
+              }}
+            >
+              <strong>Пијара</strong>
+              <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
+            </button>
+          )}
         </section>
       </section>
     );

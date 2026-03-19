@@ -1,3 +1,4 @@
+using Pecenje.Api.Infrastructure.Demo;
 using Pecenje.Api.Contracts.Auth;
 
 namespace Pecenje.Api.Services;
@@ -6,13 +7,19 @@ public sealed class DemoAuthService : IAuthService
 {
     public LoginResponse Login(LoginRequest request)
     {
-        return (request.Username.Trim().ToLowerInvariant(), request.Password) switch
+        var username = request.Username.Trim().ToLowerInvariant();
+        if (!DemoUserAccessRepository.TryAuthenticate(username, request.Password, out var match))
         {
-            ("admin", "1234") => BuildResponse(1, "Администратор", "administrator", 1, new[] { "dashboard.read", "planning.write", "production.write", "reports.export" }),
-            ("operator", "1111") => BuildResponse(2, "Оператор Аеродром 1", "operator", 1, new[] { "production.write" }),
-            ("manager", "2222") => BuildResponse(3, "Шеф Центар", "market_manager", 2, new[] { "planning.write", "reports.export" }),
-            _ => throw new UnauthorizedAccessException("Погрешно корисничко име или лозинка.")
-        };
+            throw new UnauthorizedAccessException("Погрешно корисничко име или лозинка.");
+        }
+
+        return BuildResponse(
+            match.UserId,
+            match.FullName,
+            match.RoleCode,
+            match.DefaultLocationId,
+            BuildPermissions(match.RoleCode, match.Locations)
+        );
     }
 
     private static LoginResponse BuildResponse(long id, string fullName, string role, int? defaultLocationId, IReadOnlyList<string> permissions)
@@ -28,5 +35,33 @@ public sealed class DemoAuthService : IAuthService
                 permissions
             )
         );
+    }
+
+    private static IReadOnlyList<string> BuildPermissions(string role, IReadOnlyList<Contracts.Users.UserLocationPermissionDto> locations)
+    {
+        var permissions = new List<string>();
+
+        if (role == "administrator")
+        {
+            permissions.AddRange(["dashboard.read", "planning.write", "production.write", "reports.export"]);
+            return permissions;
+        }
+
+        if (locations.Any((entry) => entry.CanPlan))
+        {
+            permissions.Add("planning.write");
+        }
+
+        if (locations.Any((entry) => entry.CanBake || entry.CanUsePekara || entry.CanUsePecenjara || entry.CanUsePijara))
+        {
+            permissions.Add("production.write");
+        }
+
+        if (locations.Any((entry) => entry.CanViewReports))
+        {
+            permissions.Add("reports.export");
+        }
+
+        return permissions;
     }
 }

@@ -176,10 +176,17 @@ export type LoginResponse = {
 };
 
 export type CreateUserRequest = {
+  defaultLocationId: number;
   username: string;
   fullName: string;
+  password: string;
   roleCode: string;
   isActive: boolean;
+  canUsePekara: boolean;
+  canUsePecenjara: boolean;
+  canUsePijara: boolean;
+  pekaraOvenType: string;
+  pecenjaraOvenType: string;
 };
 
 export type UserLocationPermission = {
@@ -192,5 +199,7 @@ export type UserLocationPermission = {
   canApprovePlan: boolean;
   canUsePekara: boolean;
   canUsePecenjara: boolean;
-  ovenType?: string | null;
+  canUsePijara: boolean;
+  pekaraOvenType?: string | null;
+  pecenjaraOvenType?: string | null;
 };

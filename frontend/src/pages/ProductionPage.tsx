@@ -74,14 +74,16 @@ export function ProductionPage() {
   }, [assignedBakeLocations, user?.defaultLocationId]);
 
   const modeAccess = useMemo(() => {
-    const permissions = permissionsQuery.data?.data ?? [];
+    const permission = activeLocation
+      ? (permissionsQuery.data?.data ?? []).find((entry) => entry.locationId === activeLocation.locationId) ?? null
+      : null;
 
     return {
-      pekara: permissions.some((entry) => entry.canBake && entry.canUsePekara),
-      pecenjara: permissions.some((entry) => entry.canBake && entry.canUsePecenjara),
-      pijara: permissions.some((entry) => entry.canBake)
+      pekara: Boolean(permission?.canBake && permission.canUsePekara),
+      pecenjara: Boolean(permission?.canBake && permission.canUsePecenjara),
+      pijara: Boolean(permission?.canBake && permission.canUsePijara)
     };
-  }, [permissionsQuery.data]);
+  }, [activeLocation, permissionsQuery.data]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -133,7 +135,10 @@ export function ProductionPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
-    if (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") {
+    if (
+      (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") &&
+      modeAccess[requestedMode]
+    ) {
       setSelectedMode(requestedMode);
       return;
     }

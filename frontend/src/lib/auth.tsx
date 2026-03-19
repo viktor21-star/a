@@ -14,6 +14,10 @@ export function isAdministrator(user: AuthUser | null) {
   return user?.role === "administrator";
 }
 
+export function isOperator(user: AuthUser | null) {
+  return user?.role === "operator";
+}
+
 type AuthState = {
   user: AuthUser | null;
   accessToken: string | null;

@@ -10,5 +10,7 @@ public sealed record UserLocationPermissionDto(
     bool CanApprovePlan,
     bool CanUsePekara,
     bool CanUsePecenjara,
-    string? OvenType = null
+    bool CanUsePijara,
+    string? PekaraOvenType = null,
+    string? PecenjaraOvenType = null
 );

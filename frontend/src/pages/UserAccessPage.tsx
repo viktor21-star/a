@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useCreateUser, useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
+import { useCreateUser, useLocations, useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
 import type { CreateUserRequest, UserLocationPermission } from "../lib/types";
 
 type PermissionField =
@@ -11,24 +11,35 @@ type PermissionField =
   | "canViewReports"
   | "canApprovePlan"
   | "canUsePekara"
-  | "canUsePecenjara";
+  | "canUsePecenjara"
+  | "canUsePijara";
 
 const ovenTypes = ["Нема", "Ротациона", "Камена", "Комбинирана", "Конвекциска"];
+
+const emptyUser: CreateUserRequest = {
+  defaultLocationId: 0,
+  username: "",
+  fullName: "",
+  password: "",
+  roleCode: "operator",
+  isActive: true,
+  canUsePekara: false,
+  canUsePecenjara: false,
+  canUsePijara: false,
+  pekaraOvenType: "Нема",
+  pecenjaraOvenType: "Нема"
+};
 
 export function UserAccessPage() {
   const { user } = useAuth();
   const usersQuery = useUsers();
+  const locationsListQuery = useLocations();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const locationsQuery = useUserLocations(selectedUserId);
   const updateMutation = useUpdateUserLocations();
   const createUserMutation = useCreateUser();
   const [draft, setDraft] = useState<UserLocationPermission[]>([]);
-  const [newUser, setNewUser] = useState<CreateUserRequest>({
-    username: "",
-    fullName: "",
-    roleCode: "operator",
-    isActive: true
-  });
+  const [newUser, setNewUser] = useState<CreateUserRequest>(emptyUser);
   const selectedUser = usersQuery.data?.data.find((entry) => entry.userId === selectedUserId) ?? null;
   const operatorUserSelected = selectedUser?.roleCode === "operator";
 
@@ -39,21 +50,37 @@ export function UserAccessPage() {
   }, [selectedUserId, usersQuery.data]);
 
   useEffect(() => {
+    if (locationsListQuery.data?.data.length && !newUser.defaultLocationId) {
+      setNewUser((current) => ({
+        ...current,
+        defaultLocationId: locationsListQuery.data?.data[0]?.locationId ?? 0
+      }));
+    }
+  }, [locationsListQuery.data, newUser.defaultLocationId]);
+
+  useEffect(() => {
     if (locationsQuery.data?.data) {
       setDraft(locationsQuery.data.data);
     }
   }, [locationsQuery.data]);
 
+  const selectedLocationName = useMemo(
+    () =>
+      locationsListQuery.data?.data.find((entry) => entry.locationId === newUser.defaultLocationId)?.nameMk ??
+      "Избери локација",
+    [locationsListQuery.data, newUser.defaultLocationId]
+  );
+
   if (!isAdministrator(user)) {
     return <PageState message="Само администратор може да креира корисници и да менува привилегии." />;
   }
 
-  if (usersQuery.isLoading) {
-    return <PageState message="Се вчитуваат корисници..." />;
+  if (usersQuery.isLoading || locationsListQuery.isLoading) {
+    return <PageState message="Се вчитуваат корисници и локации..." />;
   }
 
-  if (usersQuery.isError || !usersQuery.data) {
-    return <PageState message="Не може да се вчитаат корисниците." />;
+  if (usersQuery.isError || !usersQuery.data || locationsListQuery.isError || !locationsListQuery.data) {
+    return <PageState message="Не може да се вчитаат корисниците или локациите." />;
   }
 
   return (
@@ -61,8 +88,8 @@ export function UserAccessPage() {
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Администрација</p>
-          <h3>Корисници, локации и тип на печка</h3>
-          <p className="meta">За секој корисник се дефинира на кои локации работи и каков тип на печка користи на таа локација.</p>
+          <h3>Креирање корисник и привилегии по локација</h3>
+          <p className="meta">Прво се избира работна локација, потоа username, лозинка, улога, тип на печка и модулите што ќе ги гледа операторот.</p>
         </div>
       </header>
 
@@ -72,23 +99,50 @@ export function UserAccessPage() {
         </div>
         <div className="admin-form-grid">
           <article className="admin-input-tile">
-            <span>Име и презиме</span>
+            <span>1. Работна локација</span>
+            <select
+              value={newUser.defaultLocationId}
+              onChange={(event) => setNewUser((current) => ({ ...current, defaultLocationId: Number(event.target.value) }))}
+            >
+              {locationsListQuery.data.data.map((location) => (
+                <option key={location.locationId} value={location.locationId}>
+                  {location.code} · {location.nameMk}
+                </option>
+              ))}
+            </select>
+            <small>{selectedLocationName}</small>
+          </article>
+
+          <article className="admin-input-tile">
+            <span>2. Име и презиме</span>
             <input
               value={newUser.fullName}
               placeholder="Име и презиме"
               onChange={(event) => setNewUser((current) => ({ ...current, fullName: event.target.value }))}
             />
           </article>
+
           <article className="admin-input-tile">
-            <span>Корисничко име</span>
+            <span>3. Корисничко име</span>
             <input
               value={newUser.username}
               placeholder="Корисничко име"
               onChange={(event) => setNewUser((current) => ({ ...current, username: event.target.value }))}
             />
           </article>
+
           <article className="admin-input-tile">
-            <span>Улога</span>
+            <span>4. Лозинка</span>
+            <input
+              type="password"
+              value={newUser.password}
+              placeholder="Лозинка"
+              onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
+            />
+          </article>
+
+          <article className="admin-input-tile">
+            <span>5. Улога</span>
             <select
               value={newUser.roleCode}
               onChange={(event) => setNewUser((current) => ({ ...current, roleCode: event.target.value }))}
@@ -98,32 +152,93 @@ export function UserAccessPage() {
               <option value="market_manager">Менаџер</option>
             </select>
           </article>
-          <article className="admin-input-tile admin-input-tile--action">
-            <span>Акција</span>
-            <button
-              className="action-button"
-              type="button"
-              onClick={() => {
-                if (!newUser.username || !newUser.fullName) {
-                  return;
-                }
 
-                createUserMutation.mutate(newUser, {
-                  onSuccess: (response) => {
-                    setSelectedUserId(response.data.userId);
-                    setNewUser({
-                      username: "",
-                      fullName: "",
-                      roleCode: "operator",
-                      isActive: true
-                    });
-                  }
-                });
-              }}
+          <article className="admin-input-tile">
+            <span>6. Печка за Пекара</span>
+            <select
+              value={newUser.pekaraOvenType}
+              onChange={(event) => setNewUser((current) => ({ ...current, pekaraOvenType: event.target.value }))}
             >
-              Креирај корисник
-            </button>
+              {ovenTypes.map((ovenType) => (
+                <option key={ovenType} value={ovenType}>
+                  {ovenType}
+                </option>
+              ))}
+            </select>
           </article>
+
+          <article className="admin-input-tile">
+            <span>7. Печка за Печењара</span>
+            <select
+              value={newUser.pecenjaraOvenType}
+              onChange={(event) => setNewUser((current) => ({ ...current, pecenjaraOvenType: event.target.value }))}
+            >
+              {ovenTypes.map((ovenType) => (
+                <option key={ovenType} value={ovenType}>
+                  {ovenType}
+                </option>
+              ))}
+            </select>
+          </article>
+        </div>
+
+        <div className="operator-explainer">
+          <strong>8. Модули за операторот на оваа локација</strong>
+          <span>Ако не му дадеш модул, тој модул нема да го гледа на home екранот.</span>
+        </div>
+
+        <div className="mode-grid">
+          <button
+            className={`mode-tile${newUser.canUsePekara ? " mode-tile--active" : ""}`}
+            type="button"
+            onClick={() => setNewUser((current) => ({ ...current, canUsePekara: !current.canUsePekara }))}
+          >
+            Пекара
+          </button>
+          <button
+            className={`mode-tile${newUser.canUsePecenjara ? " mode-tile--active" : ""}`}
+            type="button"
+            onClick={() => setNewUser((current) => ({ ...current, canUsePecenjara: !current.canUsePecenjara }))}
+          >
+            Печењара
+          </button>
+          <button
+            className={`mode-tile${newUser.canUsePijara ? " mode-tile--active" : ""}`}
+            type="button"
+            onClick={() => setNewUser((current) => ({ ...current, canUsePijara: !current.canUsePijara }))}
+          >
+            Пијара
+          </button>
+        </div>
+
+        <div className="login-actions">
+          <button
+            className="action-button"
+            type="button"
+            onClick={() => {
+              if (
+                !newUser.defaultLocationId ||
+                !newUser.username ||
+                !newUser.fullName ||
+                !newUser.password ||
+                (!newUser.canUsePekara && !newUser.canUsePecenjara && !newUser.canUsePijara)
+              ) {
+                return;
+              }
+
+              createUserMutation.mutate(newUser, {
+                onSuccess: (response) => {
+                  setSelectedUserId(response.data.userId);
+                  setNewUser({
+                    ...emptyUser,
+                    defaultLocationId: locationsListQuery.data.data[0]?.locationId ?? 0
+                  });
+                }
+              });
+            }}
+          >
+            Креирај корисник
+          </button>
         </div>
       </section>
 
@@ -150,7 +265,7 @@ export function UserAccessPage() {
 
         <section className="panel">
           <div className="panel-header">
-            <h3>Локации и дозволи</h3>
+            <h3>Локација и привилегии за избраниот корисник</h3>
             <button
               className="action-button"
               type="button"
@@ -174,9 +289,8 @@ export function UserAccessPage() {
 
           {operatorUserSelected && (
             <div className="operator-explainer">
-              <strong>Операторска логика</strong>
-              <span>Операторот треба да има една работна локација.</span>
-              <span>Локацијата на која е вклучено печење ќе биде единствената што ќе му се прикажува во внесот.</span>
+              <strong>Оператор</strong>
+              <span>Операторот треба да работи на една локација и таму да ги има само дозволените модули.</span>
             </div>
           )}
 
@@ -185,19 +299,35 @@ export function UserAccessPage() {
               <article className="permission-card permission-card--large" key={`${entry.locationId}-${entry.locationName}`}>
                 <strong>{entry.locationName}</strong>
 
-                <label className="permission-select">
-                  <span>Тип на печка</span>
-                  <select
-                    value={entry.ovenType ?? "Нема"}
-                    onChange={(event) => updateOvenType(index, event.target.value)}
-                  >
-                    {ovenTypes.map((ovenType) => (
-                      <option key={ovenType} value={ovenType}>
-                        {ovenType}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="admin-form-grid">
+                  <article className="admin-input-tile">
+                    <span>Печка за Пекара</span>
+                    <select
+                      value={entry.pekaraOvenType ?? "Нема"}
+                      onChange={(event) => updateOvenType(index, "pekaraOvenType", event.target.value)}
+                    >
+                      {ovenTypes.map((ovenType) => (
+                        <option key={ovenType} value={ovenType}>
+                          {ovenType}
+                        </option>
+                      ))}
+                    </select>
+                  </article>
+
+                  <article className="admin-input-tile">
+                    <span>Печка за Печењара</span>
+                    <select
+                      value={entry.pecenjaraOvenType ?? "Нема"}
+                      onChange={(event) => updateOvenType(index, "pecenjaraOvenType", event.target.value)}
+                    >
+                      {ovenTypes.map((ovenType) => (
+                        <option key={ovenType} value={ovenType}>
+                          {ovenType}
+                        </option>
+                      ))}
+                    </select>
+                  </article>
+                </div>
 
                 <div className="permission-check-grid">
                   <label><input type="checkbox" checked={entry.canPlan} onChange={() => toggle(index, "canPlan")} /> Планирање</label>
@@ -222,6 +352,13 @@ export function UserAccessPage() {
                   >
                     Печењара
                   </button>
+                  <button
+                    className={`mode-tile${entry.canUsePijara ? " mode-tile--active" : ""}`}
+                    type="button"
+                    onClick={() => toggle(index, "canUsePijara")}
+                  >
+                    Пијара
+                  </button>
                 </div>
               </article>
             ))}
@@ -240,7 +377,7 @@ export function UserAccessPage() {
 
       const nextValue = !target[field];
 
-      if (operatorUserSelected && (field === "canBake" || field === "canUsePekara" || field === "canUsePecenjara") && nextValue) {
+      if (operatorUserSelected && (field === "canBake" || field === "canUsePekara" || field === "canUsePecenjara" || field === "canUsePijara") && nextValue) {
         return current.map((entry, currentIndex) => {
           if (currentIndex === index) {
             return { ...entry, [field]: nextValue };
@@ -250,7 +387,8 @@ export function UserAccessPage() {
             ...entry,
             canBake: false,
             canUsePekara: false,
-            canUsePecenjara: false
+            canUsePecenjara: false,
+            canUsePijara: false
           };
         });
       }
@@ -261,10 +399,10 @@ export function UserAccessPage() {
     });
   }
 
-  function updateOvenType(index: number, ovenType: string) {
+  function updateOvenType(index: number, field: "pekaraOvenType" | "pecenjaraOvenType", ovenType: string) {
     setDraft((current) =>
       current.map((entry, currentIndex) =>
-        currentIndex === index ? { ...entry, ovenType } : entry
+        currentIndex === index ? { ...entry, [field]: ovenType } : entry
       )
     );
   }
