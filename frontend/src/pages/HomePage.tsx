@@ -78,7 +78,11 @@ export function HomePage() {
         pekara: activePermission.canBake && activePermission.canUsePekara,
         pecenjara: activePermission.canBake && activePermission.canUsePecenjara,
         pijara: activePermission.canBake && activePermission.canUsePijara,
-        waste: activePermission.canRecordWaste
+        waste:
+          activePermission.canRecordWaste ||
+          activePermission.canUsePekara ||
+          activePermission.canUsePecenjara ||
+          activePermission.canUsePijara
       }
     : { pekara: false, pecenjara: false, pijara: false, waste: false };
 

@@ -87,7 +87,7 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
                 GetLocationName(request.DefaultLocationId),
                 request.RoleCode is "administrator" or "market_manager",
                 request.CanUsePekara || request.CanUsePecenjara || request.CanUsePijara,
-                request.RoleCode is "administrator" or "market_manager",
+                request.RoleCode is "administrator" or "market_manager" || request.CanUsePekara || request.CanUsePecenjara || request.CanUsePijara,
                 request.RoleCode is "administrator" or "market_manager",
                 request.RoleCode == "administrator",
                 request.CanUsePekara,
@@ -131,8 +131,15 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
 
     public Task<IReadOnlyList<UserLocationPermissionDto>> UpdateUserLocationsAsync(long userId, UpdateUserLocationsRequest request, CancellationToken cancellationToken = default)
     {
-        PermissionsByUser[userId] = request.Locations.ToList();
-        return Task.FromResult<IReadOnlyList<UserLocationPermissionDto>>(request.Locations);
+        var normalized = request.Locations
+            .Select(location => location with
+            {
+                CanRecordWaste = location.CanRecordWaste || location.CanUsePekara || location.CanUsePecenjara || location.CanUsePijara
+            })
+            .ToList();
+
+        PermissionsByUser[userId] = normalized;
+        return Task.FromResult<IReadOnlyList<UserLocationPermissionDto>>(normalized);
     }
 
     public Task<UserAuthenticationResultDto?> AuthenticateAsync(string username, string password, CancellationToken cancellationToken = default)

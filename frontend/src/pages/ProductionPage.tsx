@@ -65,7 +65,12 @@ export function ProductionPage() {
       pekara: Boolean(permission?.canBake && permission.canUsePekara),
       pecenjara: Boolean(permission?.canBake && permission.canUsePecenjara),
       pijara: Boolean(permission?.canBake && permission.canUsePijara),
-      waste: Boolean(permission?.canRecordWaste)
+      waste: Boolean(
+        permission?.canRecordWaste ||
+        permission?.canUsePekara ||
+        permission?.canUsePecenjara ||
+        permission?.canUsePijara
+      )
     };
   }, [activeLocation, permissionsQuery.data]);
 

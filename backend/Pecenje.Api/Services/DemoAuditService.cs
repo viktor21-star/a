@@ -5,18 +5,25 @@ namespace Pecenje.Api.Services;
 
 public sealed class DemoAuditService(IAuditLogRepository? auditLogRepository = null) : IAuditService
 {
-    public Task LogAsync(string entityName, string actionCode, string entityId, object payload, CancellationToken cancellationToken = default)
+    public async Task LogAsync(string entityName, string actionCode, string entityId, object payload, CancellationToken cancellationToken = default)
     {
         if (auditLogRepository is null)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return auditLogRepository.WriteAsync(
-            entityName,
-            actionCode,
-            entityId,
-            JsonSerializer.Serialize(payload),
-            cancellationToken);
+        try
+        {
+            await auditLogRepository.WriteAsync(
+                entityName,
+                actionCode,
+                entityId,
+                JsonSerializer.Serialize(payload),
+                cancellationToken);
+        }
+        catch
+        {
+            // Audit failures must not break operational flows on the local workstation setup.
+        }
     }
 }

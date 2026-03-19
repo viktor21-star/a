@@ -29,7 +29,7 @@ public sealed class ProductionAppService(
     {
         await locationAccessAppService.EnsureLocationAccessAsync(
             request.LocationId,
-            permission => permission.CanRecordWaste && HasWasteModePermission(permission, request.SourceMode),
+            permission => (permission.CanRecordWaste || HasAnyWasteModuleAccess(permission)) && HasWasteModePermission(permission, request.SourceMode),
             "Корисникот нема дозвола да пријавува отпад за оваа локација и модул.",
             cancellationToken);
 
@@ -81,4 +81,7 @@ public sealed class ProductionAppService(
             _ => false
         };
     }
+
+    private static bool HasAnyWasteModuleAccess(UserLocationPermissionDto permission)
+        => permission.CanUsePekara || permission.CanUsePecenjara || permission.CanUsePijara;
 }

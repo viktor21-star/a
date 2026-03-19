@@ -213,7 +213,7 @@ export function UserAccessPage() {
 
         <div className="operator-explainer">
           <strong>Модули на работната локација</strong>
-          <span>Нов корисник ќе ги гледа само штиклираните операторски модули.</span>
+          <span>Нов корисник ќе ги гледа само штиклираните операторски модули. Отпад се додава автоматски според избраните модули.</span>
         </div>
 
         <div className="mode-grid">
@@ -374,7 +374,12 @@ export function UserAccessPage() {
 
                     updateLocationsMutation.mutate({
                       userId: selectedUserId,
-                      payload: { locations: draft }
+                      payload: {
+                        locations: draft.map((entry) => ({
+                          ...entry,
+                          canRecordWaste: entry.canRecordWaste || entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara
+                        }))
+                      }
                     });
                   }}
                 >
@@ -429,7 +434,7 @@ export function UserAccessPage() {
                     <div className="permission-check-grid">
                       <label><input type="checkbox" checked={entry.canPlan} onChange={() => toggle(index, "canPlan")} /> Планирање</label>
                       <label><input type="checkbox" checked={entry.canBake} onChange={() => toggle(index, "canBake")} /> Печење</label>
-                      <label><input type="checkbox" checked={entry.canRecordWaste} onChange={() => toggle(index, "canRecordWaste")} /> Отпад</label>
+                      <label><input type="checkbox" checked={entry.canRecordWaste || entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara} readOnly /> Отпад (автоматски)</label>
                       <label><input type="checkbox" checked={entry.canViewReports} onChange={() => toggle(index, "canViewReports")} /> Извештаи</label>
                       <label><input type="checkbox" checked={entry.canApprovePlan} onChange={() => toggle(index, "canApprovePlan")} /> Одобрување</label>
                     </div>
