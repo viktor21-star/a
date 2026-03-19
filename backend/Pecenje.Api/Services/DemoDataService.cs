@@ -34,11 +34,20 @@ public sealed class DemoDataService
     {
         return new[]
         {
-            new BakingPlanCardDto(501, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "06:00", "Бурек со сирење", 40, 44, "одобрено"),
-            new BakingPlanCardDto(502, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "07:30", "Кифла", 60, 60, "во тек"),
-            new BakingPlanCardDto(503, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "09:00", "Лиснато", 35, 30, "не започнато")
+            new BakingPlanCardDto(501, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "06:00", "Бурек со сирење", 40, 44, "pekara", "одобрено"),
+            new BakingPlanCardDto(502, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "07:30", "Кифла", 60, 60, "pekara", "во тек"),
+            new BakingPlanCardDto(503, DateOnly.FromDateTime(DateTime.Today), 1, "Аеродром 1", "Прва смена", "09:00", "Лиснато", 35, 30, "pekara", "не започнато")
         };
     }
+
+    public string GetLocationName(int locationId) => locationId switch
+    {
+        1 => "Аеродром 1",
+        2 => "Центар",
+        3 => "Карпош",
+        4 => "Битола 1",
+        _ => $"Локација {locationId}"
+    };
 
     public IReadOnlyList<BatchDetailDto> GetBatches()
     {

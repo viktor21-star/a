@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useLocations, usePlans } from "../lib/queries";
+import { useCreatePlan, useLocations, usePlans } from "../lib/queries";
 
 type PlanningMode = "pekara" | "pecenjara";
 
@@ -12,14 +12,12 @@ type ManualPlanEntry = {
   plannedQty: number;
 };
 
-const STORAGE_KEY = "pecenje-manual-plans";
-
 export function PlanningPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = usePlans();
   const locationsQuery = useLocations();
+  const createPlanMutation = useCreatePlan();
   const [selectedMode, setSelectedMode] = useState<PlanningMode | null>(null);
-  const [manualPlans, setManualPlans] = useState<ManualPlanEntry[]>([]);
   const [nameSearch, setNameSearch] = useState("");
   const [codeSearch, setCodeSearch] = useState("");
   const [draft, setDraft] = useState<ManualPlanEntry>({
@@ -28,29 +26,6 @@ export function PlanningPage() {
     plannedTime: "07:00",
     plannedQty: 12
   });
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as Array<
-        ManualPlanEntry & { termLabel?: string; itemId?: number; mode?: PlanningMode }
-      >;
-      setManualPlans(
-        parsed.map((entry) => ({
-          mode: entry.mode ?? "pekara",
-          locationId: entry.locationId,
-          plannedQty: entry.plannedQty,
-          plannedTime: entry.plannedTime ?? extractTime(entry.termLabel)
-        }))
-      );
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -88,20 +63,20 @@ export function PlanningPage() {
   }, [filteredLocations]);
 
   const totals = useMemo(() => {
-    const rows = selectedMode ? manualPlans.filter((entry) => entry.mode === selectedMode) : manualPlans;
+    const rows = selectedMode ? (data?.data ?? []).filter((entry) => entry.mode === selectedMode) : (data?.data ?? []);
     return rows.reduce(
       (summary, entry) => ({
         markets: new Set([...summary.markets, entry.locationId]),
-        qty: summary.qty + entry.plannedQty
+        qty: summary.qty + Number(entry.correctedQty)
       }),
       { markets: new Set<number>(), qty: 0 }
     );
-  }, [manualPlans, selectedMode]);
+  }, [data, selectedMode]);
 
   const visiblePlans = useMemo(() => {
-    const rows = selectedMode ? manualPlans.filter((entry) => entry.mode === selectedMode) : manualPlans;
-    return [...rows].sort((left, right) => left.plannedTime.localeCompare(right.plannedTime));
-  }, [manualPlans, selectedMode]);
+    const rows = selectedMode ? (data?.data ?? []).filter((entry) => entry.mode === selectedMode) : (data?.data ?? []);
+    return [...rows].sort((left, right) => left.termLabel.localeCompare(right.termLabel));
+  }, [data, selectedMode]);
 
   if (isLoading || locationsQuery.isLoading) {
     return <PageState message="Се вчитува планот..." />;
@@ -185,7 +160,7 @@ export function PlanningPage() {
             </article>
             <article className="admin-stat-tile">
               <span>Системски редови</span>
-              <strong>{data.data.filter((card) => mapPlanCardMode(card.itemName) === selectedMode).length}</strong>
+              <strong>{data.data.filter((card) => card.mode === selectedMode).length}</strong>
             </article>
           </section>
 
@@ -248,23 +223,21 @@ export function PlanningPage() {
               <button
                 className="action-button"
                 type="button"
+                disabled={createPlanMutation.isPending}
                 onClick={() => {
                   if (!draft.locationId || !draft.plannedTime || draft.plannedQty <= 0) {
                     return;
                   }
 
-                  const nextEntry: ManualPlanEntry = {
+                  createPlanMutation.mutate({
                     mode: selectedMode,
                     locationId: draft.locationId,
                     plannedTime: draft.plannedTime,
                     plannedQty: draft.plannedQty
-                  };
-                  const next = [nextEntry, ...manualPlans];
-                  setManualPlans(next);
-                  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+                  });
                 }}
               >
-                Додади план
+                {createPlanMutation.isPending ? "Снима..." : "Додади план"}
               </button>
             </article>
           </section>
@@ -274,15 +247,15 @@ export function PlanningPage() {
               <h3>Рачно внесен план</h3>
             </div>
             <div className="card-list admin-summary-grid">
-              {visiblePlans.map((entry, index) => (
-                <article className="workflow-card admin-tile-card" key={`${entry.mode}-${entry.locationId}-${entry.plannedTime}-${index}`}>
+              {visiblePlans.map((entry) => (
+                <article className="workflow-card admin-tile-card" key={`${entry.planHeaderId}-${entry.locationId}-${entry.termLabel}`}>
                   <div className="workflow-card__top">
-                    <span className="pill">{entry.plannedTime}</span>
+                    <span className="pill">{entry.termLabel}</span>
                     <span className="status-chip">{entry.mode === "pekara" ? "Пекара" : "Печењара"}</span>
                   </div>
-                  <h4>{locations.find((location) => location.locationId === entry.locationId)?.nameMk ?? entry.locationId}</h4>
+                  <h4>{entry.locationName}</h4>
                   <p>Шифра: {locations.find((location) => location.locationId === entry.locationId)?.code ?? "-"}</p>
-                  <p>Количина: {entry.plannedQty}</p>
+                  <p>Количина: {entry.correctedQty}</p>
                 </article>
               ))}
             </div>
@@ -291,20 +264,4 @@ export function PlanningPage() {
       )}
     </section>
   );
-}
-
-function extractTime(termLabel?: string) {
-  if (!termLabel) {
-    return "07:00";
-  }
-
-  const match = termLabel.match(/(\d{1,2}:\d{2})/);
-  return match?.[1] ?? "07:00";
-}
-
-function mapPlanCardMode(itemName: string) {
-  const normalized = itemName.toLowerCase();
-  return ["пиле", "мес", "ќебап", "кобас", "скара", "грил"].some((value) => normalized.includes(value))
-    ? "pecenjara"
-    : "pekara";
 }

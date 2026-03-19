@@ -2,6 +2,7 @@ using Pecenje.Api.Configuration;
 using Pecenje.Api.Endpoints;
 using Pecenje.Api.Extensions;
 using Pecenje.Api.Services;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,12 +32,27 @@ var app = builder.Build();
 
 var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
 staticFileContentTypeProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
+var frontendDistPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "frontend", "dist"));
+var frontendDistExists = Directory.Exists(frontendDistPath);
 
 app.UseExceptionHandler();
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = staticFileContentTypeProvider
 });
+if (frontendDistExists)
+{
+    app.UseDefaultFiles(new DefaultFilesOptions
+    {
+        FileProvider = new PhysicalFileProvider(frontendDistPath),
+        RequestPath = ""
+    });
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(frontendDistPath),
+        ContentTypeProvider = staticFileContentTypeProvider
+    });
+}
 app.UseCors("frontend");
 
 if (app.Environment.IsDevelopment())
@@ -63,5 +79,23 @@ app.MapMasterDataEndpoints();
 app.MapIntegrationEndpoints();
 app.MapUserAccessEndpoints();
 app.MapVersionEndpoints();
+
+if (frontendDistExists)
+{
+    app.MapFallback(async context =>
+    {
+        var requestPath = context.Request.Path.Value ?? string.Empty;
+        if (requestPath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
+            requestPath.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
+            requestPath.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
+            requestPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await context.Response.SendFileAsync(Path.Combine(frontendDistPath, "index.html"));
+    });
+}
 
 app.Run();

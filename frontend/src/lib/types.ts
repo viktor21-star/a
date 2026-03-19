@@ -36,7 +36,15 @@ export type PlanCard = {
   itemName: string;
   suggestedQty: number;
   correctedQty: number;
+  mode: "pekara" | "pecenjara";
   status: string;
+};
+
+export type CreateManualPlanRequest = {
+  mode: "pekara" | "pecenjara";
+  locationId: number;
+  plannedTime: string;
+  plannedQty: number;
 };
 
 export type BatchDetail = {

@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddHttpContextAccessor();
         services.AddSingleton<DemoDataService>();
+        services.AddSingleton<InMemoryManualPlanningStore>();
         services.AddScoped<IAuthService, DemoAuthService>();
         services.AddScoped<IAuditService, DemoAuditService>();
         services.AddScoped<ICurrentUserProvider, HttpCurrentUserProvider>();

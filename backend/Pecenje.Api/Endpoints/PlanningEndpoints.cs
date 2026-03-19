@@ -14,7 +14,11 @@ public static class PlanningEndpoints
             new ApiEnvelope<IReadOnlyList<BakingPlanCardDto>>(await appService.GetPlansAsync(cancellationToken))));
 
         group.MapPost("/generate", () => Results.Accepted());
-        group.MapPost("/", () => Results.Created("/api/v1/baking-plans/501", new { planHeaderId = 501 }));
+        group.MapPost("/", async (CreateManualPlanRequest request, PlanningAppService appService, CancellationToken cancellationToken) =>
+        {
+            var result = await appService.CreateManualPlanAsync(request, cancellationToken);
+            return Results.Created($"/api/v1/baking-plans/{result.PlanHeaderId}", new ApiEnvelope<BakingPlanCardDto>(result));
+        });
         group.MapPost("/{planHeaderId:long}/approve", (long planHeaderId) => Results.Ok(new { planHeaderId, status = "одобрено" }));
 
         return app;

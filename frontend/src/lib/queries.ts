@@ -6,6 +6,7 @@ import type {
   AppVersionPolicy,
   UpdateAppVersionPolicyRequest,
   BatchDetail,
+  CreateManualPlanRequest,
   CreateUserRequest,
   DashboardOverview,
   Item,
@@ -49,6 +50,17 @@ export function usePlans() {
   return useQuery({
     queryKey: ["plans"],
     queryFn: () => api.getPlans<ApiEnvelope<PlanCard[]>>()
+  });
+}
+
+export function useCreatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateManualPlanRequest) => api.createPlan<ApiEnvelope<PlanCard>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+    }
   });
 }
 

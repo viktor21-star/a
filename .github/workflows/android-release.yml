@@ -2,6 +2,11 @@ name: android-release
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/android-release.yml"
 
 jobs:
   build-signed-release:
@@ -60,3 +65,13 @@ jobs:
           name: pecenje-release-apk
           path: frontend/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: Publish APK to stable GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-release
+          name: Latest Release APK
+          prerelease: true
+          make_latest: false
+          files: frontend/android/app/build/outputs/apk/release/app-release.apk
+          overwrite_files: true

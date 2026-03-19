@@ -19,5 +19,6 @@ public sealed record BakingPlanCardDto(
     string ItemName,
     decimal SuggestedQty,
     decimal CorrectedQty,
+    string Mode,
     string Status
 );

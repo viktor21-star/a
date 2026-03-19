@@ -13,4 +13,7 @@ public sealed class PlanningAppService(
         var plans = await planningRepository.GetDailyPlansAsync(cancellationToken);
         return plans.Where(x => allowedLocationIds.Contains(x.LocationId)).ToList();
     }
+
+    public Task<BakingPlanCardDto> CreateManualPlanAsync(CreateManualPlanRequest request, CancellationToken cancellationToken = default)
+        => planningRepository.CreateManualPlanAsync(request, cancellationToken);
 }

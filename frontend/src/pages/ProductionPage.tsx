@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useBatches, useItems, useUserLocations, useWasteEntries } from "../lib/queries";
+import { useBatches, useItems, usePlans, useUserLocations, useWasteEntries } from "../lib/queries";
 import type { Item } from "../lib/types";
 
 type EntryMode = "pekara" | "pecenjara" | "pijara";
@@ -26,7 +26,6 @@ type OperatorEntry = {
 };
 
 const STORAGE_KEY = "pecenje-operator-entries";
-const PLAN_STORAGE_KEY = "pecenje-manual-plans";
 
 function createEntryId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -41,6 +40,7 @@ export function ProductionPage() {
   const batchesQuery = useBatches();
   const wasteQuery = useWasteEntries();
   const itemsQuery = useItems();
+  const plansQuery = usePlans();
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [entries, setEntries] = useState<OperatorEntry[]>([]);
@@ -49,7 +49,6 @@ export function ProductionPage() {
     { itemName: "", quantity: 10, classB: false, classBQuantity: 0 }
   ]);
   const [itemSearch, setItemSearch] = useState<string[]>([""]);
-  const [plannedEntries, setPlannedEntries] = useState<Array<{ mode: "pekara" | "pecenjara"; locationId: number; plannedTime: string; plannedQty: number }>>([]);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
   const itemReady = draftItems.some((entry) => Boolean(entry.itemName));
@@ -132,21 +131,6 @@ export function ProductionPage() {
   }, []);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(PLAN_STORAGE_KEY);
-    if (!raw) {
-      setPlannedEntries([]);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as Array<{ mode: "pekara" | "pecenjara"; locationId: number; plannedTime: string; plannedQty: number }>;
-      setPlannedEntries(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setPlannedEntries([]);
-    }
-  }, []);
-
-  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
     if (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") {
@@ -224,11 +208,11 @@ export function ProductionPage() {
     return () => window.clearTimeout(timer);
   }, [saveConfirmation]);
 
-  if (permissionsQuery.isLoading || itemsQuery.isLoading) {
+  if (permissionsQuery.isLoading || itemsQuery.isLoading || plansQuery.isLoading) {
     return <PageState message="Се вчитуваат оперативните податоци..." />;
   }
 
-  if (permissionsQuery.isError || itemsQuery.isError) {
+  if (permissionsQuery.isError || itemsQuery.isError || plansQuery.isError) {
     return <PageState message="Не може да се вчита оперативниот модул." />;
   }
 
@@ -245,9 +229,9 @@ export function ProductionPage() {
   }
 
   const activePlan = !isAdministrator(user) && selectedMode && selectedMode !== "pijara"
-    ? plannedEntries
+    ? (plansQuery.data?.data ?? [])
         .filter((entry) => entry.mode === selectedMode && entry.locationId === activeLocation?.locationId)
-        .sort((left, right) => left.plannedTime.localeCompare(right.plannedTime))
+        .sort((left, right) => left.termLabel.localeCompare(right.termLabel))
     : [];
 
   if (!isAdministrator(user)) {
@@ -361,8 +345,8 @@ export function ProductionPage() {
                   <span>Нема внесен план за оваа локација и модул.</span>
                 ) : (
                   activePlan.map((entry, index) => (
-                    <span key={`${entry.mode}-${entry.locationId}-${entry.plannedTime}-${index}`}>
-                      {entry.plannedTime} · {entry.plannedQty} парчиња
+                    <span key={`${entry.planHeaderId}-${entry.locationId}-${entry.termLabel}-${index}`}>
+                      {entry.termLabel} · {entry.correctedQty} парчиња
                     </span>
                   ))
                 )}

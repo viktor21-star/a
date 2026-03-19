@@ -61,6 +61,7 @@ export const api = {
   getVersionPolicy: <T>() => request<T>("/version-policy"),
   updateVersionPolicy: <T>(body: unknown) => send<T>("/version-policy", "PUT", body),
   getPlans: <T>() => request<T>("/baking-plans"),
+  createPlan: <T>(body: unknown) => send<T>("/baking-plans", "POST", body),
   getBatches: <T>() => request<T>("/batches"),
   getWaste: <T>() => request<T>("/waste"),
   getAlerts: <T>() => request<T>("/alerts"),
