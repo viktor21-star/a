@@ -5,7 +5,7 @@ import { isAdministrator, useAuth } from "../lib/auth";
 const masterSections = [
   { title: "Локации", description: "Маркетите што влегуваат во планот, реализацијата и алармите.", path: "/master-data/locations" },
   { title: "Артикли", description: "Артикли што се планираат и се печат по локација.", path: "/master-data/items" },
-  { title: "Печки", description: "Типови на печка по локација за операторски и админ внес." },
+  { title: "Печки", description: "Типови на печка и број на печки по локација.", path: "/master-data/ovens" },
   { title: "Термини", description: "Часови и прозорци кога треба да биде готово печењето." },
   { title: "Корисници", description: "Кој корисник за која локација работи и што смее да прави." },
   { title: "Причини", description: "Причини за разлика, отпад или доцнење во реално печење." }

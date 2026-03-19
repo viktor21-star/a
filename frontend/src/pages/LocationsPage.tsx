@@ -3,22 +3,49 @@ import { isAdministrator, useAuth } from "../lib/auth";
 import { useLocations } from "../lib/queries";
 import { PageState } from "../components/PageState";
 
+type OvenModeConfig = {
+  ovenType: string;
+  ovenCount: number;
+  ovenCapacity: number;
+};
+
+type LocationOvenConfig = {
+  locationId: number;
+  pekara: OvenModeConfig;
+  pecenjara: OvenModeConfig;
+};
+
+const OVEN_STORAGE_KEY = "pecenje-location-ovens";
+
 export function LocationsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useLocations();
-  const [search, setSearch] = useState("");
+  const [nameSearch, setNameSearch] = useState("");
+  const [codeSearch, setCodeSearch] = useState("");
+  const [ovens] = useState<LocationOvenConfig[]>(() => {
+    const raw = window.localStorage.getItem(OVEN_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      return JSON.parse(raw) as LocationOvenConfig[];
+    } catch {
+      return [];
+    }
+  });
 
   const filteredLocations = useMemo(() => {
     const rows = data?.data ?? [];
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return rows;
-    }
+    const nameQuery = nameSearch.trim().toLowerCase();
+    const codeQuery = codeSearch.trim().toLowerCase();
 
-    return rows.filter((location) =>
-      [location.nameMk, location.code, location.regionCode].some((value) => value.toLowerCase().includes(query))
-    );
-  }, [data, search]);
+    return rows.filter((location) => {
+      const matchesName = !nameQuery || [location.nameMk, location.regionCode].some((value) => value.toLowerCase().includes(nameQuery));
+      const matchesCode = !codeQuery || location.code.toLowerCase().includes(codeQuery);
+      return matchesName && matchesCode;
+    });
+  }, [codeSearch, data, nameSearch]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Локациите ги одржува администратор." />;
@@ -46,12 +73,20 @@ export function LocationsPage() {
         <div className="panel-header">
           <h3>Пребарување низ локации</h3>
         </div>
-        <input
-          className="search-input"
-          value={search}
-          placeholder="Пребарај по име, код или регион"
-          onChange={(event) => setSearch(event.target.value)}
-        />
+        <div className="master-form master-form--inline">
+          <input
+            className="search-input"
+            value={nameSearch}
+            placeholder="Пребарај по име или регион"
+            onChange={(event) => setNameSearch(event.target.value)}
+          />
+          <input
+            className="search-input"
+            value={codeSearch}
+            placeholder="Пребарај по шифра"
+            onChange={(event) => setCodeSearch(event.target.value)}
+          />
+        </div>
       </section>
 
       <section className="panel">
@@ -67,7 +102,18 @@ export function LocationsPage() {
                 <span className="status-chip">{location.isActive ? "Активна" : "Неактивна"}</span>
               </div>
               <h4>{location.nameMk}</h4>
+              <p>Шифра: {location.code}</p>
               <p>Регион: {location.regionCode}</p>
+              <p>
+                Пекара: {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenType ?? "Нема"} ·{" "}
+                {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenCount ?? 0} · капацитет{" "}
+                {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenCapacity ?? 0}
+              </p>
+              <p>
+                Печењара: {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenType ?? "Нема"} ·{" "}
+                {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenCount ?? 0} · капацитет{" "}
+                {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenCapacity ?? 0}
+              </p>
             </article>
           ))}
         </div>

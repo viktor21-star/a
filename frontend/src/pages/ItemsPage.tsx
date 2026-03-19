@@ -7,19 +7,20 @@ import type { Item } from "../lib/types";
 export function ItemsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useItems();
-  const [search, setSearch] = useState("");
+  const [nameSearch, setNameSearch] = useState("");
+  const [codeSearch, setCodeSearch] = useState("");
 
   const filteredItems = useMemo(() => {
     const rows = data?.data ?? [];
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return rows;
-    }
+    const nameQuery = nameSearch.trim().toLowerCase();
+    const codeQuery = codeSearch.trim().toLowerCase();
 
-    return rows.filter((item) =>
-      [item.nameMk, item.code, item.groupName].some((value) => value.toLowerCase().includes(query))
-    );
-  }, [data, search]);
+    return rows.filter((item) => {
+      const matchesName = !nameQuery || [item.nameMk, item.groupName].some((value) => value.toLowerCase().includes(nameQuery));
+      const matchesCode = !codeQuery || item.code.toLowerCase().includes(codeQuery);
+      return matchesName && matchesCode;
+    });
+  }, [codeSearch, data, nameSearch]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Артиклите ги одржува администратор." />;
@@ -47,12 +48,20 @@ export function ItemsPage() {
         <div className="panel-header">
           <h3>Пребарување низ артикли</h3>
         </div>
-        <input
-          className="search-input"
-          value={search}
-          placeholder="Пребарај по име, код или група"
-          onChange={(event) => setSearch(event.target.value)}
-        />
+        <div className="master-form master-form--inline">
+          <input
+            className="search-input"
+            value={nameSearch}
+            placeholder="Пребарај по име или група"
+            onChange={(event) => setNameSearch(event.target.value)}
+          />
+          <input
+            className="search-input"
+            value={codeSearch}
+            placeholder="Пребарај по шифра"
+            onChange={(event) => setCodeSearch(event.target.value)}
+          />
+        </div>
       </section>
 
       <section className="panel">
@@ -68,6 +77,7 @@ export function ItemsPage() {
                 <span className="status-chip">{item.isActive ? "Активен" : "Неактивен"}</span>
               </div>
               <h4>{item.nameMk}</h4>
+              <p>Шифра: {item.code}</p>
               <p>Група код: {item.groupCode || "-"}</p>
               <p>Група: {item.groupName}</p>
               <p>Се користи во: {describeItemModes(item)}</p>

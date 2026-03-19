@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useItems, useLocations, usePlans } from "../lib/queries";
+import { useLocations, usePlans } from "../lib/queries";
+
+type PlanningMode = "pekara" | "pecenjara";
 
 type ManualPlanEntry = {
+  mode: PlanningMode;
   locationId: number;
-  itemId: number;
   plannedTime: string;
   plannedQty: number;
 };
@@ -16,11 +18,13 @@ export function PlanningPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = usePlans();
   const locationsQuery = useLocations();
-  const itemsQuery = useItems();
+  const [selectedMode, setSelectedMode] = useState<PlanningMode | null>(null);
   const [manualPlans, setManualPlans] = useState<ManualPlanEntry[]>([]);
+  const [nameSearch, setNameSearch] = useState("");
+  const [codeSearch, setCodeSearch] = useState("");
   const [draft, setDraft] = useState<ManualPlanEntry>({
+    mode: "pekara",
     locationId: 1,
-    itemId: 1,
     plannedTime: "07:00",
     plannedQty: 12
   });
@@ -32,11 +36,13 @@ export function PlanningPage() {
     }
 
     try {
-      const parsed = JSON.parse(raw) as Array<ManualPlanEntry & { termLabel?: string }>;
+      const parsed = JSON.parse(raw) as Array<
+        ManualPlanEntry & { termLabel?: string; itemId?: number; mode?: PlanningMode }
+      >;
       setManualPlans(
         parsed.map((entry) => ({
+          mode: entry.mode ?? "pekara",
           locationId: entry.locationId,
-          itemId: entry.itemId,
           plannedQty: entry.plannedQty,
           plannedTime: entry.plannedTime ?? extractTime(entry.termLabel)
         }))
@@ -46,24 +52,62 @@ export function PlanningPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
+    if (requestedMode === "pekara" || requestedMode === "pecenjara") {
+      setSelectedMode(requestedMode);
+      setDraft((current) => ({ ...current, mode: requestedMode }));
+    }
+  }, []);
+
   const locations = locationsQuery.data?.data ?? [];
-  const items = itemsQuery.data?.data ?? [];
+  const filteredLocations = useMemo(() => {
+    const nameQuery = nameSearch.trim().toLowerCase();
+    const codeQuery = codeSearch.trim().toLowerCase();
+
+    return locations.filter((location) => {
+      const matchesName = !nameQuery || location.nameMk.toLowerCase().includes(nameQuery);
+      const matchesCode = !codeQuery || location.code.toLowerCase().includes(codeQuery);
+      return matchesName && matchesCode;
+    });
+  }, [codeSearch, locations, nameSearch]);
+
+  useEffect(() => {
+    if (!filteredLocations.length) {
+      return;
+    }
+
+    setDraft((current) => {
+      if (filteredLocations.some((location) => location.locationId === current.locationId)) {
+        return current;
+      }
+
+      return { ...current, locationId: filteredLocations[0].locationId };
+    });
+  }, [filteredLocations]);
 
   const totals = useMemo(() => {
-    return manualPlans.reduce(
+    const rows = selectedMode ? manualPlans.filter((entry) => entry.mode === selectedMode) : manualPlans;
+    return rows.reduce(
       (summary, entry) => ({
         markets: new Set([...summary.markets, entry.locationId]),
         qty: summary.qty + entry.plannedQty
       }),
       { markets: new Set<number>(), qty: 0 }
     );
-  }, [manualPlans]);
+  }, [manualPlans, selectedMode]);
 
-  if (isLoading) {
+  const visiblePlans = useMemo(() => {
+    const rows = selectedMode ? manualPlans.filter((entry) => entry.mode === selectedMode) : manualPlans;
+    return [...rows].sort((left, right) => left.plannedTime.localeCompare(right.plannedTime));
+  }, [manualPlans, selectedMode]);
+
+  if (isLoading || locationsQuery.isLoading) {
     return <PageState message="Се вчитува планот..." />;
   }
 
-  if (isError || !data || locationsQuery.isError || itemsQuery.isError) {
+  if (isError || !data || locationsQuery.isError) {
     return <PageState message="Не може да се вчита планот." />;
   }
 
@@ -71,146 +115,180 @@ export function PlanningPage() {
     return <PageState message="Планот на печење го внесува и следи администратор." />;
   }
 
-  if (locationsQuery.isLoading || itemsQuery.isLoading) {
-    return <PageState message="Се вчитуваат локации и артикли..." />;
-  }
-
   return (
     <section className="page-grid">
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Планирање</p>
-          <h3>План на печење по маркет, саат и количина</h3>
-          <p className="meta">Администраторот го внесува планот како големи кочки: маркет, артикал, саат и количина.</p>
+          <h3>{selectedMode ? `План за ${selectedMode === "pekara" ? "Пекара" : "Печењара"}` : "Избери дел за планирање"}</h3>
+          <p className="meta">
+            {selectedMode
+              ? "Администраторот внесува само време, локација и количина. Артикал не се избира."
+              : "Планот се дели на две големи кочки: Пекара и Печењара."}
+          </p>
         </div>
+        {selectedMode && (
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              setSelectedMode(null);
+              setDraft((current) => ({ ...current, mode: "pekara" }));
+              window.history.replaceState({}, "", "/planning");
+            }}
+          >
+            Назад
+          </button>
+        )}
       </header>
 
-      <section className="admin-hero-grid">
-        <article className="admin-stat-tile">
-          <span>Маркетите во план</span>
-          <strong>{totals.markets.size}</strong>
-        </article>
-        <article className="admin-stat-tile">
-          <span>Вкупно планирани парчиња</span>
-          <strong>{totals.qty}</strong>
-        </article>
-        <article className="admin-stat-tile">
-          <span>Автоматски предлог</span>
-          <strong>{data.data.length}</strong>
-        </article>
-      </section>
-
-      <section className="admin-form-grid">
-        <article className="admin-input-tile">
-          <span>1. Одбери маркет</span>
-          <select
-            value={draft.locationId}
-            onChange={(event) => setDraft((current) => ({ ...current, locationId: Number(event.target.value) }))}
+      {!selectedMode && (
+        <section className="operator-mode-grid">
+          <button
+            type="button"
+            className="operator-mode-card"
+            onClick={() => {
+              setSelectedMode("pekara");
+              setDraft((current) => ({ ...current, mode: "pekara" }));
+              window.history.replaceState({}, "", "/planning?mode=pekara");
+            }}
           >
-            {locations.map((location) => (
-              <option key={location.locationId} value={location.locationId}>
-                {location.nameMk}
-              </option>
-            ))}
-          </select>
-        </article>
+            <strong>Пекара</strong>
+            <span>План по локација, време и количина за пекарски производи.</span>
+          </button>
 
-        <article className="admin-input-tile">
-          <span>2. Одбери артикал</span>
-          <select
-            value={draft.itemId}
-            onChange={(event) => setDraft((current) => ({ ...current, itemId: Number(event.target.value) }))}
+          <button
+            type="button"
+            className="operator-mode-card"
+            onClick={() => {
+              setSelectedMode("pecenjara");
+              setDraft((current) => ({ ...current, mode: "pecenjara" }));
+              window.history.replaceState({}, "", "/planning?mode=pecenjara");
+            }}
           >
-            {items.map((item) => (
-              <option key={item.itemId} value={item.itemId}>
-                {item.nameMk}
-              </option>
-            ))}
-          </select>
-        </article>
-
-        <article className="admin-input-tile">
-          <span>3. Внеси саат</span>
-          <input
-            type="time"
-            value={draft.plannedTime}
-            onChange={(event) => setDraft((current) => ({ ...current, plannedTime: event.target.value }))}
-          />
-        </article>
-
-        <article className="admin-input-tile">
-          <span>4. Внеси количина</span>
-          <input
-            type="number"
-            min="0"
-            value={draft.plannedQty}
-            onChange={(event) => setDraft((current) => ({ ...current, plannedQty: Number(event.target.value) }))}
-          />
-        </article>
-      </section>
-
-      <div className="page-header">
-        <div>
-          <p className="topbar-eyebrow">Акција</p>
-          <h3>Сними во план</h3>
-        </div>
-        <button
-          className="action-button"
-          type="button"
-          onClick={() => {
-            if (!draft.locationId || !draft.itemId || !draft.plannedTime || draft.plannedQty <= 0) {
-              return;
-            }
-
-            const next = [draft, ...manualPlans];
-            setManualPlans(next);
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          }}
-        >
-          Додади план
-        </button>
-      </div>
-
-      {manualPlans.length > 0 && (
-        <section className="panel">
-          <div className="panel-header">
-            <h3>Рачно внесен план</h3>
-          </div>
-          <div className="card-list admin-summary-grid">
-            {manualPlans.map((entry, index) => (
-              <article className="workflow-card admin-tile-card" key={`${entry.locationId}-${entry.itemId}-${entry.plannedTime}-${index}`}>
-                <div className="workflow-card__top">
-                  <span className="pill">{entry.plannedTime}</span>
-                  <span className="status-chip">Планирано</span>
-                </div>
-                <h4>{items.find((item) => item.itemId === entry.itemId)?.nameMk ?? entry.itemId}</h4>
-                <p>Маркет: {locations.find((location) => location.locationId === entry.locationId)?.nameMk ?? entry.locationId}</p>
-                <p>Количина: {entry.plannedQty}</p>
-              </article>
-            ))}
-          </div>
+            <strong>Печењара</strong>
+            <span>План по локација, време и количина за печењара.</span>
+          </button>
         </section>
       )}
 
-      <section className="panel">
-        <div className="panel-header">
-          <h3>Предложен план од системот</h3>
-        </div>
-        <div className="card-list admin-summary-grid">
-          {data.data.map((card) => (
-            <article className="workflow-card admin-tile-card" key={`${card.termLabel}-${card.itemName}-${card.locationId}`}>
-              <div className="workflow-card__top">
-                <span className="pill">{card.termLabel}</span>
-                <span className="status-chip">{card.status}</span>
-              </div>
-              <h4>{card.itemName}</h4>
-              <p>Маркет: {card.locationName}</p>
-              <p>Предлог: {card.suggestedQty}</p>
-              <p>Корекција: {card.correctedQty}</p>
+      {selectedMode && (
+        <>
+          <section className="admin-hero-grid">
+            <article className="admin-stat-tile">
+              <span>Локации во план</span>
+              <strong>{totals.markets.size}</strong>
             </article>
-          ))}
-        </div>
-      </section>
+            <article className="admin-stat-tile">
+              <span>Вкупно планирани парчиња</span>
+              <strong>{totals.qty}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Системски редови</span>
+              <strong>{data.data.filter((card) => mapPlanCardMode(card.itemName) === selectedMode).length}</strong>
+            </article>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h3>Избери локација</h3>
+            </div>
+            <div className="master-form master-form--inline">
+              <input
+                className="search-input"
+                value={nameSearch}
+                placeholder="Пребарај по име на локација"
+                onChange={(event) => setNameSearch(event.target.value)}
+              />
+              <input
+                className="search-input"
+                value={codeSearch}
+                placeholder="Пребарај по шифра на локација"
+                onChange={(event) => setCodeSearch(event.target.value)}
+              />
+            </div>
+          </section>
+
+          <section className="admin-form-grid">
+            <article className="admin-input-tile">
+              <span>1. Одбери локација</span>
+              <select
+                value={draft.locationId}
+                onChange={(event) => setDraft((current) => ({ ...current, locationId: Number(event.target.value) }))}
+              >
+                {filteredLocations.map((location) => (
+                  <option key={location.locationId} value={location.locationId}>
+                    {location.code} · {location.nameMk}
+                  </option>
+                ))}
+              </select>
+            </article>
+
+            <article className="admin-input-tile">
+              <span>2. Внеси време на печење</span>
+              <input
+                type="time"
+                value={draft.plannedTime}
+                onChange={(event) => setDraft((current) => ({ ...current, plannedTime: event.target.value }))}
+              />
+            </article>
+
+            <article className="admin-input-tile">
+              <span>3. Внеси количина</span>
+              <input
+                type="number"
+                min="0"
+                value={draft.plannedQty}
+                onChange={(event) => setDraft((current) => ({ ...current, plannedQty: Number(event.target.value) }))}
+              />
+            </article>
+
+            <article className="admin-input-tile admin-input-tile--action">
+              <span>4. Сними план</span>
+              <button
+                className="action-button"
+                type="button"
+                onClick={() => {
+                  if (!draft.locationId || !draft.plannedTime || draft.plannedQty <= 0) {
+                    return;
+                  }
+
+                  const nextEntry: ManualPlanEntry = {
+                    mode: selectedMode,
+                    locationId: draft.locationId,
+                    plannedTime: draft.plannedTime,
+                    plannedQty: draft.plannedQty
+                  };
+                  const next = [nextEntry, ...manualPlans];
+                  setManualPlans(next);
+                  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+                }}
+              >
+                Додади план
+              </button>
+            </article>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h3>Рачно внесен план</h3>
+            </div>
+            <div className="card-list admin-summary-grid">
+              {visiblePlans.map((entry, index) => (
+                <article className="workflow-card admin-tile-card" key={`${entry.mode}-${entry.locationId}-${entry.plannedTime}-${index}`}>
+                  <div className="workflow-card__top">
+                    <span className="pill">{entry.plannedTime}</span>
+                    <span className="status-chip">{entry.mode === "pekara" ? "Пекара" : "Печењара"}</span>
+                  </div>
+                  <h4>{locations.find((location) => location.locationId === entry.locationId)?.nameMk ?? entry.locationId}</h4>
+                  <p>Шифра: {locations.find((location) => location.locationId === entry.locationId)?.code ?? "-"}</p>
+                  <p>Количина: {entry.plannedQty}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
     </section>
   );
 }
@@ -222,4 +300,11 @@ function extractTime(termLabel?: string) {
 
   const match = termLabel.match(/(\d{1,2}:\d{2})/);
   return match?.[1] ?? "07:00";
+}
+
+function mapPlanCardMode(itemName: string) {
+  const normalized = itemName.toLowerCase();
+  return ["пиле", "мес", "ќебап", "кобас", "скара", "грил"].some((value) => normalized.includes(value))
+    ? "pecenjara"
+    : "pekara";
 }

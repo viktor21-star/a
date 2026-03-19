@@ -9,6 +9,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { MasterDataPage } from "./pages/MasterDataPage";
 import { LocationsPage } from "./pages/LocationsPage";
 import { ItemsPage } from "./pages/ItemsPage";
+import { OvensPage } from "./pages/OvensPage";
 import { UserAccessPage } from "./pages/UserAccessPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { HomePage } from "./pages/HomePage";
@@ -34,6 +35,7 @@ export function App() {
         <Route path="master-data" element={<MasterDataPage />} />
         <Route path="master-data/locations" element={<LocationsPage />} />
         <Route path="master-data/items" element={<ItemsPage />} />
+        <Route path="master-data/ovens" element={<OvensPage />} />
         <Route path="user-access" element={<UserAccessPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="version-policy" element={<VersionPolicyPage />} />

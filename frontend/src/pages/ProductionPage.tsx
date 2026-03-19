@@ -26,6 +26,7 @@ type OperatorEntry = {
 };
 
 const STORAGE_KEY = "pecenje-operator-entries";
+const PLAN_STORAGE_KEY = "pecenje-manual-plans";
 
 function createEntryId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -47,6 +48,8 @@ export function ProductionPage() {
   const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([
     { itemName: "", quantity: 10, classB: false, classBQuantity: 0 }
   ]);
+  const [itemSearch, setItemSearch] = useState<string[]>([""]);
+  const [plannedEntries, setPlannedEntries] = useState<Array<{ mode: "pekara" | "pecenjara"; locationId: number; plannedTime: string; plannedQty: number }>>([]);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
   const itemReady = draftItems.some((entry) => Boolean(entry.itemName));
@@ -129,6 +132,21 @@ export function ProductionPage() {
   }, []);
 
   useEffect(() => {
+    const raw = window.localStorage.getItem(PLAN_STORAGE_KEY);
+    if (!raw) {
+      setPlannedEntries([]);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Array<{ mode: "pekara" | "pecenjara"; locationId: number; plannedTime: string; plannedQty: number }>;
+      setPlannedEntries(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setPlannedEntries([]);
+    }
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
     if (requestedMode === "pekara" || requestedMode === "pecenjara" || requestedMode === "pijara") {
@@ -166,6 +184,12 @@ export function ProductionPage() {
       );
     }
   }, [availableItems, draftItems]);
+
+  useEffect(() => {
+    setItemSearch((current) =>
+      draftItems.map((entry, index) => current[index] ?? entry.itemName ?? "")
+    );
+  }, [draftItems]);
 
   useEffect(() => {
     if (!availableItems.length) {
@@ -219,6 +243,12 @@ export function ProductionPage() {
   if (!isAdministrator(user) && !activeLocation) {
     return <PageState message="Операторот нема доделена работна локација за печење." />;
   }
+
+  const activePlan = !isAdministrator(user) && selectedMode && selectedMode !== "pijara"
+    ? plannedEntries
+        .filter((entry) => entry.mode === selectedMode && entry.locationId === activeLocation?.locationId)
+        .sort((left, right) => left.plannedTime.localeCompare(right.plannedTime))
+    : [];
 
   if (!isAdministrator(user)) {
     return (
@@ -324,6 +354,21 @@ export function ProductionPage() {
               )}
             </div>
 
+            {selectedMode && selectedMode !== "pijara" && (
+              <div className="operator-explainer">
+                <strong>План за печење</strong>
+                {activePlan.length === 0 ? (
+                  <span>Нема внесен план за оваа локација и модул.</span>
+                ) : (
+                  activePlan.map((entry, index) => (
+                    <span key={`${entry.mode}-${entry.locationId}-${entry.plannedTime}-${index}`}>
+                      {entry.plannedTime} · {entry.plannedQty} парчиња
+                    </span>
+                  ))
+                )}
+              </div>
+            )}
+
             {saveConfirmation && (
               <div className="operator-success-banner">
                 <strong>Успешно снимено</strong>
@@ -376,6 +421,17 @@ export function ProductionPage() {
                   <div className="operator-lines-grid">
                     {draftItems.map((entry, index) => (
                       <div className="operator-line-row" key={`${entry.itemName}-${index}`}>
+                        <input
+                          className="search-input"
+                          value={itemSearch[index] ?? ""}
+                          placeholder="Пребарај по име или шифра"
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setItemSearch((current) =>
+                              current.map((value, valueIndex) => (valueIndex === index ? nextValue : value))
+                            );
+                          }}
+                        />
                         <select
                           value={entry.itemName}
                           onChange={(event) => {
@@ -385,14 +441,32 @@ export function ProductionPage() {
                                 lineIndex === index ? { ...line, itemName: nextValue } : line
                               )
                             );
+                            const selected = availableItems.find((item) => item.nameMk === nextValue);
+                            setItemSearch((current) =>
+                              current.map((value, valueIndex) =>
+                                valueIndex === index ? `${selected?.code ?? ""} ${nextValue}`.trim() : value
+                              )
+                            );
                           }}
                         >
-                          {availableItems.map((item) => (
-                            <option key={item.itemId} value={item.nameMk}>
-                              {item.nameMk}
-                            </option>
-                          ))}
+                          {availableItems
+                            .filter((item) => {
+                              const query = (itemSearch[index] ?? "").trim().toLowerCase();
+                              if (!query) {
+                                return true;
+                              }
+
+                              return [item.nameMk, item.code].some((value) => value.toLowerCase().includes(query));
+                            })
+                            .map((item) => (
+                              <option key={item.itemId} value={item.nameMk}>
+                                {item.code} · {item.nameMk}
+                              </option>
+                            ))}
                         </select>
+                        <span className="meta">
+                          Шифра: {availableItems.find((item) => item.nameMk === entry.itemName)?.code ?? "-"}
+                        </span>
                         <input
                           type="number"
                           min="0"
@@ -451,6 +525,7 @@ export function ProductionPage() {
                             type="button"
                             onClick={() => {
                               setDraftItems((current) => current.filter((_, lineIndex) => lineIndex !== index));
+                              setItemSearch((current) => current.filter((_, lineIndex) => lineIndex !== index));
                             }}
                           >
                             Тргни
@@ -468,6 +543,7 @@ export function ProductionPage() {
                         ...current,
                         { itemName: fallbackItem, quantity: 10, classB: false, classBQuantity: 0 }
                       ]);
+                      setItemSearch((current) => [...current, fallbackItem]);
                     }}
                   >
                     Додади уште артикал
@@ -526,6 +602,7 @@ export function ProductionPage() {
                           classBQuantity: 0
                         }
                       ]);
+                      setItemSearch([availableItems[0]?.nameMk ?? ""]);
                       triggerSuccessFeedback();
                       setSaveConfirmation(
                         `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
