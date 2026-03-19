@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { isAdministrator, useAuth } from "../lib/auth";
+import { syncPendingOperatorEntries } from "../lib/operatorEntryQueue";
 
 export function AppShell() {
   const { mode, toggle } = useTheme();
@@ -9,6 +11,17 @@ export function AppShell() {
   const navigate = useNavigate();
   const adminMode = isAdministrator(user);
   const isHome = location.pathname === "/";
+
+  useEffect(() => {
+    void syncPendingOperatorEntries();
+
+    const handleOnline = () => {
+      void syncPendingOperatorEntries();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
 
   if (!adminMode) {
     return (

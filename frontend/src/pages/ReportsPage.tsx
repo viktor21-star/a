@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useExportPlanVsActualExcel, useExportPlanVsActualPdf, usePlanVsActualReport } from "../lib/queries";
+import { useExportPlanVsActualExcel, useExportPlanVsActualPdf, useOperatorEntries, usePlanVsActualReport } from "../lib/queries";
 
 const reports = [
   "Извештај за испечено",
@@ -11,27 +11,12 @@ const reports = [
   "Отпад по локација"
 ];
 
-const OPERATOR_STORAGE_KEY = "pecenje-operator-entries";
-
-type StoredOperatorEntry = {
-  id: string;
-  mode: "pekara" | "pecenjara" | "pijara";
-  locationName?: string;
-  createdAt: string;
-  items: Array<{
-    itemName: string;
-    quantity: number;
-    classB?: boolean;
-    classBQuantity?: number;
-  }>;
-};
-
 export function ReportsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = usePlanVsActualReport();
   const exportExcel = useExportPlanVsActualExcel();
   const exportPdf = useExportPlanVsActualPdf();
-  const [operatorEntries, setOperatorEntries] = useState<StoredOperatorEntry[]>([]);
+  const operatorEntriesQuery = useOperatorEntries();
 
   useEffect(() => {
     if (exportExcel.data?.data) {
@@ -53,21 +38,6 @@ export function ReportsPage() {
     }
   }, [exportPdf.data]);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(OPERATOR_STORAGE_KEY);
-    if (!raw) {
-      setOperatorEntries([]);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as StoredOperatorEntry[];
-      setOperatorEntries(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setOperatorEntries([]);
-    }
-  }, []);
-
   const bakedSummary = useMemo(() => {
     if (!data?.data) {
       return [];
@@ -79,7 +49,7 @@ export function ReportsPage() {
   }, [data]);
 
   const pijaraReport = useMemo(() => {
-    const pijaraEntries = operatorEntries.filter((entry) => entry.mode === "pijara");
+    const pijaraEntries = (operatorEntriesQuery.data?.data ?? []).filter((entry) => entry.mode === "pijara");
     const rows = pijaraEntries.flatMap((entry) =>
       (entry.items ?? []).map((item) => ({
         id: `${entry.id}-${item.itemName}`,
@@ -97,17 +67,17 @@ export function ReportsPage() {
       totalClassB: rows.reduce((sum, row) => sum + row.classBQuantity, 0),
       rows
     };
-  }, [operatorEntries]);
+  }, [operatorEntriesQuery.data]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Извештаите се достапни само за администратор." />;
   }
 
-  if (isLoading) {
+  if (isLoading || operatorEntriesQuery.isLoading) {
     return <PageState message="Се вчитуваат извештаите..." />;
   }
 
-  if (isError || !data) {
+  if (isError || !data || operatorEntriesQuery.isError) {
     return <PageState message="Не може да се вчита извештајот." />;
   }
 

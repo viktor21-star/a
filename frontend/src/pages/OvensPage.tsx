@@ -1,21 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useLocations } from "../lib/queries";
+import { useLocationOvens, useLocations, useUpdateLocationOvens } from "../lib/queries";
+import type { LocationOvenConfig, OvenModeConfig } from "../lib/types";
 
-type OvenModeConfig = {
-  ovenType: string;
-  ovenCount: number;
-  ovenCapacity: number;
-};
-
-type LocationOvenConfig = {
-  locationId: number;
-  pekara: OvenModeConfig;
-  pecenjara: OvenModeConfig;
-};
-
-const STORAGE_KEY = "pecenje-location-ovens";
 const ovenTypes = ["Нема", "Ротациона", "Камена", "Комбинирана", "Конвекциска"];
 
 function createDefaultModeConfig(): OvenModeConfig {
@@ -29,42 +17,28 @@ function createDefaultModeConfig(): OvenModeConfig {
 export function OvensPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useLocations();
+  const ovensQuery = useLocationOvens();
+  const updateLocationOvens = useUpdateLocationOvens();
   const [nameSearch, setNameSearch] = useState("");
   const [codeSearch, setCodeSearch] = useState("");
   const [draft, setDraft] = useState<LocationOvenConfig[]>([]);
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as LocationOvenConfig[];
-      setDraft(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
 
   useEffect(() => {
     if (!data?.data?.length) {
       return;
     }
 
-    setDraft((current) => {
-      const existingIds = new Set(current.map((entry) => entry.locationId));
-      const missing = data.data
-        .filter((location) => !existingIds.has(location.locationId))
-        .map((location) => ({
+    const existing = new Map((ovensQuery.data?.data ?? []).map((entry) => [entry.locationId, entry]));
+    setDraft(
+      data.data.map((location) =>
+        existing.get(location.locationId) ?? {
           locationId: location.locationId,
           pekara: createDefaultModeConfig(),
           pecenjara: createDefaultModeConfig()
-        }));
-
-      return [...current, ...missing];
-    });
-  }, [data]);
+        }
+      )
+    );
+  }, [data, ovensQuery.data]);
 
   const rows = useMemo(() => {
     const locations = data?.data ?? [];
@@ -82,11 +56,11 @@ export function OvensPage() {
     return <PageState message="Печките по локација ги одржува администратор." />;
   }
 
-  if (isLoading) {
+  if (isLoading || ovensQuery.isLoading) {
     return <PageState message="Се вчитуваат локации за печки..." />;
   }
 
-  if (isError || !data) {
+  if (isError || ovensQuery.isError || !data) {
     return <PageState message="Не може да се вчитаат печките по локација." />;
   }
 
@@ -101,11 +75,12 @@ export function OvensPage() {
         <button
           className="action-button"
           type="button"
+          disabled={updateLocationOvens.isPending}
           onClick={() => {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+            updateLocationOvens.mutate({ locations: draft });
           }}
         >
-          Сними печки
+          {updateLocationOvens.isPending ? "Се снима..." : "Сними печки"}
         </button>
       </header>
 
@@ -113,6 +88,8 @@ export function OvensPage() {
         <div className="panel-header">
           <h3>Пребарување по локација</h3>
         </div>
+        {updateLocationOvens.isSuccess ? <p className="meta">Печките се успешно снимени.</p> : null}
+        {updateLocationOvens.isError ? <p className="meta">Не може да се снимат печките. Провери дали серверот работи.</p> : null}
         <div className="master-form master-form--inline">
           <input
             className="search-input"

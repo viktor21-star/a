@@ -6,42 +6,50 @@ const adminModules = [
   {
     title: "План за печење",
     description: "Внес на план по маркет, саат и количина.",
-    path: "/planning"
+    path: "/planning",
+    imageClass: "home-card--planning"
   },
   {
     title: "Реално печење",
     description: "Само преглед на тури, оператори и последни внесови.",
-    path: "/production"
+    path: "/production",
+    imageClass: "home-card--production"
   },
   {
     title: "Аларми",
     description: "Разлика меѓу план и реално печење со критични отстапувања.",
-    path: "/alerts"
+    path: "/alerts",
+    imageClass: "home-card--alerts"
   },
   {
     title: "Извештаи",
     description: "Извештаи за испечено, реализација и export.",
-    path: "/reports"
+    path: "/reports",
+    imageClass: "home-card--reports"
   },
   {
     title: "Локации",
     description: "Маркетите што се користат во план, печење и извештаи.",
-    path: "/master-data/locations"
+    path: "/master-data/locations",
+    imageClass: "home-card--locations"
   },
   {
     title: "Шифарници",
     description: "Артикли, термини, печки и системски поставки.",
-    path: "/master-data"
+    path: "/master-data",
+    imageClass: "home-card--master-data"
   },
   {
     title: "Корисници",
     description: "Корисници, локации, дозволи и тип на печка по локација.",
-    path: "/user-access"
+    path: "/user-access",
+    imageClass: "home-card--users"
   },
   {
     title: "Верзија",
     description: "Верзија на апликацијата, download линк и force update политика.",
-    path: "/version-policy"
+    path: "/version-policy",
+    imageClass: "home-card--version"
   }
 ];
 
@@ -86,39 +94,51 @@ export function HomePage() {
           {operatorAccess.pekara && (
             <button
               type="button"
-              className="operator-home-card"
+              className="operator-home-card home-card-visual home-card--pekara"
               onClick={() => {
                 window.location.href = "/production?mode=pekara";
               }}
             >
-              <strong>Пекара</strong>
-              <span>Леб, печива, бурек, кифли и останати производи од пекара.</span>
+              <span className="home-card-number">01</span>
+              <span className="home-card-badge">Оператор</span>
+              <div className="home-card-copy">
+                <strong>Пекара</strong>
+                <span>Леб, печива, бурек, кифли и останати производи од пекара.</span>
+              </div>
             </button>
           )}
 
           {operatorAccess.pecenjara && (
             <button
               type="button"
-              className="operator-home-card"
+              className="operator-home-card home-card-visual home-card--pecenjara"
               onClick={() => {
                 window.location.href = "/production?mode=pecenjara";
               }}
             >
-              <strong>Печењара</strong>
-              <span>Пилешко, месо и производи што се водат преку печењара.</span>
+              <span className="home-card-number">02</span>
+              <span className="home-card-badge">Оператор</span>
+              <div className="home-card-copy">
+                <strong>Печењара</strong>
+                <span>Пилешко, месо и производи што се водат преку печењара.</span>
+              </div>
             </button>
           )}
 
           {operatorAccess.pijara && (
             <button
               type="button"
-              className="operator-home-card"
+              className="operator-home-card home-card-visual home-card--pijara"
               onClick={() => {
                 window.location.href = "/production?mode=pijara";
               }}
             >
-              <strong>Пијара</strong>
-              <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
+              <span className="home-card-number">03</span>
+              <span className="home-card-badge">Оператор</span>
+              <div className="home-card-copy">
+                <strong>Пијара</strong>
+                <span>Пријава на артикли со слика и посебна количина што оди како Класа Б.</span>
+              </div>
             </button>
           )}
         </section>
@@ -137,17 +157,21 @@ export function HomePage() {
       </header>
 
       <section className="admin-launch-grid">
-        {adminModules.map((module) => (
+        {adminModules.map((module, index) => (
           <button
             key={module.path}
             type="button"
-            className="admin-launch-card"
+            className={`admin-launch-card home-card-visual ${module.imageClass}`}
             onClick={() => {
               window.location.href = module.path;
             }}
           >
-            <strong>{module.title}</strong>
-            <span>{module.description}</span>
+            <span className="home-card-number">{String(index + 1).padStart(2, "0")}</span>
+            <span className="home-card-badge">Админ</span>
+            <div className="home-card-copy">
+              <strong>{module.title}</strong>
+              <span>{module.description}</span>
+            </div>
             <small>Отвори модул</small>
           </button>
         ))}

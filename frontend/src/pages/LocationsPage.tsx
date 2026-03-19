@@ -1,39 +1,16 @@
 import { useMemo, useState } from "react";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useLocations } from "../lib/queries";
+import { useLocationOvens, useLocations } from "../lib/queries";
 import { PageState } from "../components/PageState";
-
-type OvenModeConfig = {
-  ovenType: string;
-  ovenCount: number;
-  ovenCapacity: number;
-};
-
-type LocationOvenConfig = {
-  locationId: number;
-  pekara: OvenModeConfig;
-  pecenjara: OvenModeConfig;
-};
-
-const OVEN_STORAGE_KEY = "pecenje-location-ovens";
+import type { LocationOvenConfig } from "../lib/types";
 
 export function LocationsPage() {
   const { user } = useAuth();
   const { data, isLoading, isError } = useLocations();
+  const ovensQuery = useLocationOvens();
   const [nameSearch, setNameSearch] = useState("");
   const [codeSearch, setCodeSearch] = useState("");
-  const [ovens] = useState<LocationOvenConfig[]>(() => {
-    const raw = window.localStorage.getItem(OVEN_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-
-    try {
-      return JSON.parse(raw) as LocationOvenConfig[];
-    } catch {
-      return [];
-    }
-  });
+  const ovens = ovensQuery.data?.data ?? [];
 
   const filteredLocations = useMemo(() => {
     const rows = data?.data ?? [];
@@ -51,11 +28,11 @@ export function LocationsPage() {
     return <PageState message="Локациите ги одржува администратор." />;
   }
 
-  if (isLoading) {
+  if (isLoading || ovensQuery.isLoading) {
     return <PageState message="Се вчитуваат локации..." />;
   }
 
-  if (isError || !data) {
+  if (isError || ovensQuery.isError || !data) {
     return <PageState message="Не може да се вчитаат локациите." />;
   }
 
@@ -96,28 +73,36 @@ export function LocationsPage() {
         </div>
         <div className="card-list admin-summary-grid">
           {filteredLocations.map((location) => (
-            <article className="workflow-card admin-tile-card" key={location.locationId}>
-              <div className="workflow-card__top">
-                <span className="pill">{location.code}</span>
-                <span className="status-chip">{location.isActive ? "Активна" : "Неактивна"}</span>
-              </div>
-              <h4>{location.nameMk}</h4>
-              <p>Шифра: {location.code}</p>
-              <p>Регион: {location.regionCode}</p>
-              <p>
-                Пекара: {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenType ?? "Нема"} ·{" "}
-                {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenCount ?? 0} · капацитет{" "}
-                {ovens.find((entry) => entry.locationId === location.locationId)?.pekara.ovenCapacity ?? 0}
-              </p>
-              <p>
-                Печењара: {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenType ?? "Нема"} ·{" "}
-                {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenCount ?? 0} · капацитет{" "}
-                {ovens.find((entry) => entry.locationId === location.locationId)?.pecenjara.ovenCapacity ?? 0}
-              </p>
-            </article>
+            <LocationCard key={location.locationId} location={location} ovens={ovens.find((entry) => entry.locationId === location.locationId)} />
           ))}
         </div>
       </section>
     </section>
+  );
+}
+
+function LocationCard({
+  location,
+  ovens
+}: {
+  location: { locationId: number; code: string; nameMk: string; regionCode: string; isActive: boolean };
+  ovens?: LocationOvenConfig;
+}) {
+  return (
+    <article className="workflow-card admin-tile-card">
+      <div className="workflow-card__top">
+        <span className="pill">{location.code}</span>
+        <span className="status-chip">{location.isActive ? "Активна" : "Неактивна"}</span>
+      </div>
+      <h4>{location.nameMk}</h4>
+      <p>Шифра: {location.code}</p>
+      <p>Регион: {location.regionCode}</p>
+      <p>
+        Пекара: {ovens?.pekara.ovenType ?? "Нема"} · {ovens?.pekara.ovenCount ?? 0} · капацитет {ovens?.pekara.ovenCapacity ?? 0}
+      </p>
+      <p>
+        Печењара: {ovens?.pecenjara.ovenType ?? "Нема"} · {ovens?.pecenjara.ovenCount ?? 0} · капацитет {ovens?.pecenjara.ovenCapacity ?? 0}
+      </p>
+    </article>
   );
 }

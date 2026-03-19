@@ -1,6 +1,7 @@
 using Pecenje.Api.Application.Abstractions;
 using Pecenje.Api.Application.Services;
 using Pecenje.Api.Infrastructure.Demo;
+using Pecenje.Api.Infrastructure.Sqlite;
 using Pecenje.Api.Infrastructure.SqlServer;
 using Pecenje.Api.Infrastructure.Web;
 using Pecenje.Api.Services;
@@ -12,8 +13,14 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddHttpContextAccessor();
+        services.AddSingleton<LocalAppDb>();
         services.AddSingleton<DemoDataService>();
         services.AddSingleton<InMemoryManualPlanningStore>();
+        services.AddSingleton<InMemoryOperatorEntryStore>();
+        services.AddSingleton<InMemoryLocationOvenStore>();
+        services.AddSingleton<InMemoryTermStore>();
+        services.AddSingleton<InMemoryReasonStore>();
+        services.AddScoped<SqliteUserAccessRepository>();
         services.AddScoped<IAuthService, DemoAuthService>();
         services.AddScoped<IAuditService, DemoAuditService>();
         services.AddScoped<ICurrentUserProvider, HttpCurrentUserProvider>();
@@ -26,7 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAnalyticsRepository, DemoAnalyticsRepository>();
         services.AddScoped<IMasterDataRepository, SqlServerMasterDataRepository>();
         services.AddScoped<ISourceMasterDataReader, SqlServerSourceMasterDataReader>();
-        services.AddScoped<IUserAccessRepository, DemoUserAccessRepository>();
+        services.AddScoped<IUserAccessRepository, SqliteUserAccessRepository>();
         services.AddScoped<DashboardAppService>();
         services.AddScoped<PlanningAppService>();
         services.AddScoped<ProductionAppService>();
@@ -36,6 +43,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AdminAccessAppService>();
         services.AddScoped<LocationAccessAppService>();
         services.AddScoped<UserAccessAppService>();
+        services.AddScoped<OvenConfigAppService>();
+        services.AddScoped<TermAppService>();
+        services.AddScoped<ReasonAppService>();
         services.AddSingleton<AppVersioningService>();
         return services;
     }

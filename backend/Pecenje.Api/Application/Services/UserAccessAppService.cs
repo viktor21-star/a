@@ -16,6 +16,13 @@ public sealed class UserAccessAppService(IUserAccessRepository repository, IAudi
         return result;
     }
 
+    public async Task<UserSummaryDto> UpdateUserAccountAsync(long userId, UpdateUserAccountRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await repository.UpdateUserAccountAsync(userId, request, cancellationToken);
+        await auditService.LogAsync("Users", "update-account", userId.ToString(), request, cancellationToken);
+        return result;
+    }
+
     public Task<IReadOnlyList<UserLocationPermissionDto>> GetUserLocationsAsync(long userId, CancellationToken cancellationToken = default)
         => repository.GetUserLocationsAsync(userId, cancellationToken);
 

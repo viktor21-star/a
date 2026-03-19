@@ -3,12 +3,12 @@ import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
 
 const masterSections = [
-  { title: "Локации", description: "Маркетите што влегуваат во планот, реализацијата и алармите.", path: "/master-data/locations" },
-  { title: "Артикли", description: "Артикли што се планираат и се печат по локација.", path: "/master-data/items" },
-  { title: "Печки", description: "Типови на печка и број на печки по локација.", path: "/master-data/ovens" },
-  { title: "Термини", description: "Часови и прозорци кога треба да биде готово печењето." },
-  { title: "Корисници", description: "Кој корисник за која локација работи и што смее да прави." },
-  { title: "Причини", description: "Причини за разлика, отпад или доцнење во реално печење." }
+  { title: "Локации", description: "Маркетите што влегуваат во планот, реализацијата и алармите.", previewPath: "/master-data/locations" },
+  { title: "Артикли", description: "Артикли што се планираат и се печат по локација.", previewPath: "/master-data/items" },
+  { title: "Печки", description: "Типови на печка и број на печки по локација.", previewPath: "/master-data/ovens", editPath: "/master-data/ovens" },
+  { title: "Термини", description: "Часови и прозорци кога треба да биде готово печењето.", previewPath: "/master-data/terms", editPath: "/master-data/terms" },
+  { title: "Корисници", description: "Кој корисник за која локација работи и што смее да прави.", previewPath: "/user-access", editPath: "/user-access" },
+  { title: "Причини", description: "Причини за разлика, отпад или доцнење во реално печење.", previewPath: "/master-data/reasons", editPath: "/master-data/reasons" }
 ];
 
 export function MasterDataPage() {
@@ -37,14 +37,20 @@ export function MasterDataPage() {
             <h4>{section.title}</h4>
             <p>{section.description}</p>
             <div className="workflow-card__actions">
-              {section.path ? (
-                <Link className="ghost-button link-button" to={section.path}>
+              {section.previewPath ? (
+                <Link className="ghost-button link-button" to={section.previewPath}>
                   Преглед
                 </Link>
               ) : (
-                <button className="ghost-button">Преглед</button>
+                <button className="ghost-button" disabled>Преглед</button>
               )}
-              <button className="action-button">Измени</button>
+              {section.editPath ? (
+                <Link className="action-button link-button" to={section.editPath}>
+                  Измени
+                </Link>
+              ) : (
+                <button className="action-button" disabled>Само преглед</button>
+              )}
             </div>
           </article>
         ))}

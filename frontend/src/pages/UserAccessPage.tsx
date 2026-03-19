@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useCreateUser, useLocations, useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
-import type { CreateUserRequest, UserLocationPermission } from "../lib/types";
+import { useCreateUser, useLocations, useUpdateUserAccount, useUpdateUserLocations, useUserLocations, useUsers } from "../lib/queries";
+import type { CreateUserRequest, UpdateUserAccountRequest, UserLocationPermission } from "../lib/types";
 
 type PermissionField =
   | "canPlan"
@@ -30,16 +30,24 @@ const emptyUser: CreateUserRequest = {
   pecenjaraOvenType: "Нема"
 };
 
+const emptyAccountDraft: UpdateUserAccountRequest = {
+  isActive: true,
+  newPassword: ""
+};
+
 export function UserAccessPage() {
   const { user } = useAuth();
   const usersQuery = useUsers();
   const locationsListQuery = useLocations();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const locationsQuery = useUserLocations(selectedUserId);
-  const updateMutation = useUpdateUserLocations();
+  const updateLocationsMutation = useUpdateUserLocations();
+  const updateAccountMutation = useUpdateUserAccount();
   const createUserMutation = useCreateUser();
   const [draft, setDraft] = useState<UserLocationPermission[]>([]);
   const [newUser, setNewUser] = useState<CreateUserRequest>(emptyUser);
+  const [accountDraft, setAccountDraft] = useState<UpdateUserAccountRequest>(emptyAccountDraft);
+  const [userSearch, setUserSearch] = useState("");
   const selectedUser = usersQuery.data?.data.find((entry) => entry.userId === selectedUserId) ?? null;
   const operatorUserSelected = selectedUser?.roleCode === "operator";
 
@@ -64,12 +72,33 @@ export function UserAccessPage() {
     }
   }, [locationsQuery.data]);
 
+  useEffect(() => {
+    if (selectedUser) {
+      setAccountDraft({
+        isActive: selectedUser.isActive,
+        newPassword: ""
+      });
+    }
+  }, [selectedUser]);
+
   const selectedLocationName = useMemo(
     () =>
       locationsListQuery.data?.data.find((entry) => entry.locationId === newUser.defaultLocationId)?.nameMk ??
       "Избери локација",
     [locationsListQuery.data, newUser.defaultLocationId]
   );
+
+  const filteredUsers = useMemo(() => {
+    const rows = usersQuery.data?.data ?? [];
+    const query = userSearch.trim().toLowerCase();
+    if (!query) {
+      return rows;
+    }
+
+    return rows.filter((entry) =>
+      [entry.fullName, entry.username, entry.roleCode].some((value) => value.toLowerCase().includes(query))
+    );
+  }, [userSearch, usersQuery.data]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Само администратор може да креира корисници и да менува привилегии." />;
@@ -88,8 +117,8 @@ export function UserAccessPage() {
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Администрација</p>
-          <h3>Креирање корисник и привилегии по локација</h3>
-          <p className="meta">Прво се избира работна локација, потоа username, лозинка, улога, тип на печка и модулите што ќе ги гледа операторот.</p>
+          <h3>Корисници</h3>
+          <p className="meta">Новите корисници се отвораат одделно, а постоечките се пребаруваат и им се менуваат привилегии, статус и лозинка.</p>
         </div>
       </header>
 
@@ -99,7 +128,7 @@ export function UserAccessPage() {
         </div>
         <div className="admin-form-grid">
           <article className="admin-input-tile">
-            <span>1. Работна локација</span>
+            <span>Работна локација</span>
             <select
               value={newUser.defaultLocationId}
               onChange={(event) => setNewUser((current) => ({ ...current, defaultLocationId: Number(event.target.value) }))}
@@ -114,7 +143,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>2. Име и презиме</span>
+            <span>Име и презиме</span>
             <input
               value={newUser.fullName}
               placeholder="Име и презиме"
@@ -123,7 +152,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>3. Корисничко име</span>
+            <span>Корисничко име</span>
             <input
               value={newUser.username}
               placeholder="Корисничко име"
@@ -132,7 +161,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>4. Лозинка</span>
+            <span>Лозинка</span>
             <input
               type="password"
               value={newUser.password}
@@ -142,7 +171,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>5. Улога</span>
+            <span>Улога</span>
             <select
               value={newUser.roleCode}
               onChange={(event) => setNewUser((current) => ({ ...current, roleCode: event.target.value }))}
@@ -154,7 +183,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>6. Печка за Пекара</span>
+            <span>Печка за Пекара</span>
             <select
               value={newUser.pekaraOvenType}
               onChange={(event) => setNewUser((current) => ({ ...current, pekaraOvenType: event.target.value }))}
@@ -168,7 +197,7 @@ export function UserAccessPage() {
           </article>
 
           <article className="admin-input-tile">
-            <span>7. Печка за Печењара</span>
+            <span>Печка за Печењара</span>
             <select
               value={newUser.pecenjaraOvenType}
               onChange={(event) => setNewUser((current) => ({ ...current, pecenjaraOvenType: event.target.value }))}
@@ -183,30 +212,18 @@ export function UserAccessPage() {
         </div>
 
         <div className="operator-explainer">
-          <strong>8. Модули за операторот на оваа локација</strong>
-          <span>Ако не му дадеш модул, тој модул нема да го гледа на home екранот.</span>
+          <strong>Модули на работната локација</strong>
+          <span>Нов корисник ќе ги гледа само штиклираните операторски модули.</span>
         </div>
 
         <div className="mode-grid">
-          <button
-            className={`mode-tile${newUser.canUsePekara ? " mode-tile--active" : ""}`}
-            type="button"
-            onClick={() => setNewUser((current) => ({ ...current, canUsePekara: !current.canUsePekara }))}
-          >
+          <button className={`mode-tile${newUser.canUsePekara ? " mode-tile--active" : ""}`} type="button" onClick={() => setNewUser((current) => ({ ...current, canUsePekara: !current.canUsePekara }))}>
             Пекара
           </button>
-          <button
-            className={`mode-tile${newUser.canUsePecenjara ? " mode-tile--active" : ""}`}
-            type="button"
-            onClick={() => setNewUser((current) => ({ ...current, canUsePecenjara: !current.canUsePecenjara }))}
-          >
+          <button className={`mode-tile${newUser.canUsePecenjara ? " mode-tile--active" : ""}`} type="button" onClick={() => setNewUser((current) => ({ ...current, canUsePecenjara: !current.canUsePecenjara }))}>
             Печењара
           </button>
-          <button
-            className={`mode-tile${newUser.canUsePijara ? " mode-tile--active" : ""}`}
-            type="button"
-            onClick={() => setNewUser((current) => ({ ...current, canUsePijara: !current.canUsePijara }))}
-          >
+          <button className={`mode-tile${newUser.canUsePijara ? " mode-tile--active" : ""}`} type="button" onClick={() => setNewUser((current) => ({ ...current, canUsePijara: !current.canUsePijara }))}>
             Пијара
           </button>
         </div>
@@ -242,13 +259,27 @@ export function UserAccessPage() {
         </div>
       </section>
 
+      <section className="panel">
+        <div className="panel-header">
+          <h3>Постоечки корисници</h3>
+        </div>
+        <div className="master-form master-form--inline">
+          <input
+            className="search-input"
+            value={userSearch}
+            placeholder="Пребарај по име, корисничко име или улога"
+            onChange={(event) => setUserSearch(event.target.value)}
+          />
+        </div>
+      </section>
+
       <div className="panel-grid panel-grid--production">
         <aside className="panel">
           <div className="panel-header">
-            <h3>Избор на корисник</h3>
+            <h3>Листа на корисници</h3>
           </div>
           <div className="card-list admin-summary-grid">
-            {usersQuery.data.data.map((entry) => (
+            {filteredUsers.map((entry) => (
               <button
                 key={entry.userId}
                 className={`user-summary-card${selectedUserId === entry.userId ? " user-summary-card--active" : ""}`}
@@ -258,6 +289,7 @@ export function UserAccessPage() {
                 <strong>{entry.fullName}</strong>
                 <span>{entry.username}</span>
                 <span>{entry.roleCode}</span>
+                <span>{entry.isActive ? "Активен" : "Деактивиран"}</span>
               </button>
             ))}
           </div>
@@ -265,104 +297,159 @@ export function UserAccessPage() {
 
         <section className="panel">
           <div className="panel-header">
-            <h3>Локација и привилегии за избраниот корисник</h3>
-            <button
-              className="action-button"
-              type="button"
-              disabled={!selectedUserId}
-              onClick={() => {
-                if (!selectedUserId) {
-                  return;
-                }
-
-                updateMutation.mutate({
-                  userId: selectedUserId,
-                  payload: { locations: draft }
-                });
-              }}
-            >
-              Сними привилегии
-            </button>
+            <h3>Профил и привилегии</h3>
           </div>
 
-          {locationsQuery.isLoading && <div className="list-card">Се вчитуваат привилегии...</div>}
+          {!selectedUser ? (
+            <div className="list-card">Избери корисник од листата.</div>
+          ) : (
+            <>
+              <div className="admin-form-grid">
+                <article className="admin-input-tile">
+                  <span>Корисник</span>
+                  <strong>{selectedUser.fullName}</strong>
+                  <small>{selectedUser.username}</small>
+                </article>
 
-          {operatorUserSelected && (
-            <div className="operator-explainer">
-              <strong>Оператор</strong>
-              <span>Операторот треба да работи на една локација и таму да ги има само дозволените модули.</span>
-            </div>
+                <article className="admin-input-tile">
+                  <span>Улога</span>
+                  <strong>{selectedUser.roleCode}</strong>
+                  <small>{accountDraft.isActive ? "Активен" : "Деактивиран"}</small>
+                </article>
+
+                <article className="admin-input-tile">
+                  <span>Статус</span>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setAccountDraft((current) => ({ ...current, isActive: !current.isActive }))}
+                  >
+                    {accountDraft.isActive ? "Деактивирај" : "Активирај"}
+                  </button>
+                </article>
+
+                <article className="admin-input-tile">
+                  <span>Нова лозинка</span>
+                  <input
+                    type="password"
+                    value={accountDraft.newPassword ?? ""}
+                    placeholder="Остави празно ако не менуваш"
+                    onChange={(event) => setAccountDraft((current) => ({ ...current, newPassword: event.target.value }))}
+                  />
+                </article>
+              </div>
+
+              <div className="login-actions">
+                <button
+                  className="action-button"
+                  type="button"
+                  onClick={() => {
+                    if (!selectedUserId) {
+                      return;
+                    }
+
+                    updateAccountMutation.mutate({
+                      userId: selectedUserId,
+                      payload: accountDraft
+                    }, {
+                      onSuccess: () => {
+                        setAccountDraft((current) => ({ ...current, newPassword: "" }));
+                      }
+                    });
+                  }}
+                >
+                  Сними профил
+                </button>
+              </div>
+
+              <div className="panel-header">
+                <h3>Привилегии по локација</h3>
+                <button
+                  className="action-button"
+                  type="button"
+                  onClick={() => {
+                    if (!selectedUserId) {
+                      return;
+                    }
+
+                    updateLocationsMutation.mutate({
+                      userId: selectedUserId,
+                      payload: { locations: draft }
+                    });
+                  }}
+                >
+                  Сними привилегии
+                </button>
+              </div>
+
+              {locationsQuery.isLoading && <div className="list-card">Се вчитуваат привилегии...</div>}
+
+              {operatorUserSelected && (
+                <div className="operator-explainer">
+                  <strong>Оператор</strong>
+                  <span>Операторот треба да работи на една локација и таму да ги има само дозволените модули.</span>
+                </div>
+              )}
+
+              <div className="card-list admin-summary-grid">
+                {draft.map((entry, index) => (
+                  <article className="permission-card permission-card--large" key={`${entry.locationId}-${entry.locationName}`}>
+                    <strong>{entry.locationName}</strong>
+
+                    <div className="admin-form-grid">
+                      <article className="admin-input-tile">
+                        <span>Печка за Пекара</span>
+                        <select
+                          value={entry.pekaraOvenType ?? "Нема"}
+                          onChange={(event) => updateOvenType(index, "pekaraOvenType", event.target.value)}
+                        >
+                          {ovenTypes.map((ovenType) => (
+                            <option key={ovenType} value={ovenType}>
+                              {ovenType}
+                            </option>
+                          ))}
+                        </select>
+                      </article>
+
+                      <article className="admin-input-tile">
+                        <span>Печка за Печењара</span>
+                        <select
+                          value={entry.pecenjaraOvenType ?? "Нема"}
+                          onChange={(event) => updateOvenType(index, "pecenjaraOvenType", event.target.value)}
+                        >
+                          {ovenTypes.map((ovenType) => (
+                            <option key={ovenType} value={ovenType}>
+                              {ovenType}
+                            </option>
+                          ))}
+                        </select>
+                      </article>
+                    </div>
+
+                    <div className="permission-check-grid">
+                      <label><input type="checkbox" checked={entry.canPlan} onChange={() => toggle(index, "canPlan")} /> Планирање</label>
+                      <label><input type="checkbox" checked={entry.canBake} onChange={() => toggle(index, "canBake")} /> Печење</label>
+                      <label><input type="checkbox" checked={entry.canRecordWaste} onChange={() => toggle(index, "canRecordWaste")} /> Отпад</label>
+                      <label><input type="checkbox" checked={entry.canViewReports} onChange={() => toggle(index, "canViewReports")} /> Извештаи</label>
+                      <label><input type="checkbox" checked={entry.canApprovePlan} onChange={() => toggle(index, "canApprovePlan")} /> Одобрување</label>
+                    </div>
+
+                    <div className="mode-grid">
+                      <button className={`mode-tile${entry.canUsePekara ? " mode-tile--active" : ""}`} type="button" onClick={() => toggle(index, "canUsePekara")}>
+                        Пекара
+                      </button>
+                      <button className={`mode-tile${entry.canUsePecenjara ? " mode-tile--active" : ""}`} type="button" onClick={() => toggle(index, "canUsePecenjara")}>
+                        Печењара
+                      </button>
+                      <button className={`mode-tile${entry.canUsePijara ? " mode-tile--active" : ""}`} type="button" onClick={() => toggle(index, "canUsePijara")}>
+                        Пијара
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
-
-          <div className="card-list admin-summary-grid">
-            {draft.map((entry, index) => (
-              <article className="permission-card permission-card--large" key={`${entry.locationId}-${entry.locationName}`}>
-                <strong>{entry.locationName}</strong>
-
-                <div className="admin-form-grid">
-                  <article className="admin-input-tile">
-                    <span>Печка за Пекара</span>
-                    <select
-                      value={entry.pekaraOvenType ?? "Нема"}
-                      onChange={(event) => updateOvenType(index, "pekaraOvenType", event.target.value)}
-                    >
-                      {ovenTypes.map((ovenType) => (
-                        <option key={ovenType} value={ovenType}>
-                          {ovenType}
-                        </option>
-                      ))}
-                    </select>
-                  </article>
-
-                  <article className="admin-input-tile">
-                    <span>Печка за Печењара</span>
-                    <select
-                      value={entry.pecenjaraOvenType ?? "Нема"}
-                      onChange={(event) => updateOvenType(index, "pecenjaraOvenType", event.target.value)}
-                    >
-                      {ovenTypes.map((ovenType) => (
-                        <option key={ovenType} value={ovenType}>
-                          {ovenType}
-                        </option>
-                      ))}
-                    </select>
-                  </article>
-                </div>
-
-                <div className="permission-check-grid">
-                  <label><input type="checkbox" checked={entry.canPlan} onChange={() => toggle(index, "canPlan")} /> Планирање</label>
-                  <label><input type="checkbox" checked={entry.canBake} onChange={() => toggle(index, "canBake")} /> Печење</label>
-                  <label><input type="checkbox" checked={entry.canRecordWaste} onChange={() => toggle(index, "canRecordWaste")} /> Отпад</label>
-                  <label><input type="checkbox" checked={entry.canViewReports} onChange={() => toggle(index, "canViewReports")} /> Извештаи</label>
-                  <label><input type="checkbox" checked={entry.canApprovePlan} onChange={() => toggle(index, "canApprovePlan")} /> Одобрување</label>
-                </div>
-
-                <div className="mode-grid">
-                  <button
-                    className={`mode-tile${entry.canUsePekara ? " mode-tile--active" : ""}`}
-                    type="button"
-                    onClick={() => toggle(index, "canUsePekara")}
-                  >
-                    Пекара
-                  </button>
-                  <button
-                    className={`mode-tile${entry.canUsePecenjara ? " mode-tile--active" : ""}`}
-                    type="button"
-                    onClick={() => toggle(index, "canUsePecenjara")}
-                  >
-                    Печењара
-                  </button>
-                  <button
-                    className={`mode-tile${entry.canUsePijara ? " mode-tile--active" : ""}`}
-                    type="button"
-                    onClick={() => toggle(index, "canUsePijara")}
-                  >
-                    Пијара
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
         </section>
       </div>
     </section>

@@ -36,6 +36,22 @@ public sealed class SqlServerUserAccessRepository(IAppSqlConnectionFactory conne
         return created;
     }
 
+    public async Task<UserSummaryDto> UpdateUserAccountAsync(long userId, UpdateUserAccountRequest request, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        var updated = await connection.QuerySingleAsync<UserSummaryDto>(new CommandDefinition(
+            UserAccessSql.UpdateUserAccount,
+            new
+            {
+                UserId = userId,
+                request.IsActive,
+                PasswordHash = request.NewPassword
+            },
+            cancellationToken: cancellationToken));
+
+        return updated;
+    }
+
     public async Task<IReadOnlyList<UserLocationPermissionDto>> GetUserLocationsAsync(long userId, CancellationToken cancellationToken = default)
     {
         using var connection = connectionFactory.CreateConnection();
@@ -81,7 +97,10 @@ public sealed class SqlServerUserAccessRepository(IAppSqlConnectionFactory conne
                         location.CanViewReports,
                         location.CanApprovePlan,
                         location.CanUsePekara,
-                        location.CanUsePecenjara
+                        location.CanUsePecenjara,
+                        location.CanUsePijara,
+                        location.PekaraOvenType,
+                        location.PecenjaraOvenType
                     },
                     transaction: transaction,
                     cancellationToken: cancellationToken));
@@ -97,4 +116,37 @@ public sealed class SqlServerUserAccessRepository(IAppSqlConnectionFactory conne
 
         return await GetUserLocationsAsync(userId, cancellationToken);
     }
+
+    public async Task<UserAuthenticationResultDto?> AuthenticateAsync(string username, string password, CancellationToken cancellationToken = default)
+    {
+        using var connection = connectionFactory.CreateConnection();
+        var user = await connection.QuerySingleOrDefaultAsync<UserAuthenticationRow>(new CommandDefinition(
+            UserAccessSql.AuthenticateUser,
+            new { Username = username, Password = password },
+            cancellationToken: cancellationToken));
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        var locations = await GetUserLocationsAsync(user.UserId, cancellationToken);
+        return new UserAuthenticationResultDto(
+            user.UserId,
+            user.Username,
+            user.FullName,
+            user.RoleCode,
+            user.DefaultLocationId,
+            user.IsActive,
+            locations);
+    }
+
+    private sealed record UserAuthenticationRow(
+        long UserId,
+        string Username,
+        string FullName,
+        string RoleCode,
+        int? DefaultLocationId,
+        bool IsActive
+    );
 }

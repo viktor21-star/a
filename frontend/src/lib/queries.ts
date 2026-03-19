@@ -7,13 +7,22 @@ import type {
   UpdateAppVersionPolicyRequest,
   BatchDetail,
   CreateManualPlanRequest,
+  CreateOperatorEntryRequest,
   CreateUserRequest,
   DashboardOverview,
   Item,
   Location,
+  LocationOvenConfig,
+  OperatorEntry,
   PlanCard,
   PlanVsActualReport,
+  ReasonEntry,
   ReportExport,
+  TermEntry,
+  UpdateLocationOvensRequest,
+  UpdateReasonsRequest,
+  UpdateTermsRequest,
+  UpdateUserAccountRequest,
   UpsertItemRequest,
   UpsertLocationRequest,
   UserLocationPermission,
@@ -71,6 +80,25 @@ export function useBatches() {
   });
 }
 
+export function useOperatorEntries() {
+  return useQuery({
+    queryKey: ["operator-entries"],
+    queryFn: () => api.getOperatorEntries<ApiEnvelope<OperatorEntry[]>>()
+  });
+}
+
+export function useCreateOperatorEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateOperatorEntryRequest) => api.createOperatorEntry<ApiEnvelope<OperatorEntry>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operator-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["report-plan-vs-actual"] });
+    }
+  });
+}
+
 export function useWasteEntries() {
   return useQuery({
     queryKey: ["waste"],
@@ -118,6 +146,60 @@ export function useItems() {
   });
 }
 
+export function useLocationOvens() {
+  return useQuery({
+    queryKey: ["location-ovens"],
+    queryFn: () => api.getLocationOvens<ApiEnvelope<LocationOvenConfig[]>>()
+  });
+}
+
+export function useUpdateLocationOvens() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateLocationOvensRequest) => api.updateLocationOvens<ApiEnvelope<LocationOvenConfig[]>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["location-ovens"] });
+    }
+  });
+}
+
+export function useTerms() {
+  return useQuery({
+    queryKey: ["terms"],
+    queryFn: () => api.getTerms<ApiEnvelope<TermEntry[]>>()
+  });
+}
+
+export function useUpdateTerms() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateTermsRequest) => api.updateTerms<ApiEnvelope<TermEntry[]>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["terms"] });
+    }
+  });
+}
+
+export function useReasons() {
+  return useQuery({
+    queryKey: ["reasons"],
+    queryFn: () => api.getReasons<ApiEnvelope<ReasonEntry[]>>()
+  });
+}
+
+export function useUpdateReasons() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateReasonsRequest) => api.updateReasons<ApiEnvelope<ReasonEntry[]>>(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reasons"] });
+    }
+  });
+}
+
 export function useUsers() {
   return useQuery({
     queryKey: ["users"],
@@ -140,6 +222,19 @@ export function useCreateUser() {
     mutationFn: (payload: CreateUserRequest) => api.createUser<ApiEnvelope<UserSummary>>(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
+    }
+  });
+}
+
+export function useUpdateUserAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, payload }: { userId: number; payload: UpdateUserAccountRequest }) =>
+      api.updateUserAccount<ApiEnvelope<UserSummary>>(userId, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-locations", variables.userId] });
     }
   });
 }

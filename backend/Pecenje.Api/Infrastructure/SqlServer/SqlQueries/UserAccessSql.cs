@@ -30,6 +30,7 @@ public static class UserAccessSql
             FullName,
             PasswordHash,
             RoleId,
+            DefaultLocationId,
             IsActive
         )
         VALUES (
@@ -37,6 +38,7 @@ public static class UserAccessSql
             @FullName,
             @PasswordHash,
             @RoleId,
+            @DefaultLocationId,
             @IsActive
         );
 
@@ -51,6 +53,27 @@ public static class UserAccessSql
         WHERE u.UserId = CAST(SCOPE_IDENTITY() AS BIGINT);
         """;
 
+    public const string UpdateUserAccount = """
+        UPDATE dbo.Users
+        SET
+            IsActive = @IsActive,
+            PasswordHash = CASE
+                WHEN @PasswordHash IS NULL OR @PasswordHash = '' THEN PasswordHash
+                ELSE @PasswordHash
+            END
+        WHERE UserId = @UserId;
+
+        SELECT
+            u.UserId,
+            u.Username,
+            u.FullName,
+            r.Code AS RoleCode,
+            u.IsActive
+        FROM dbo.Users u
+        INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
+        WHERE u.UserId = @UserId;
+        """;
+
     public const string GetUserLocations = """
         SELECT
             ul.LocationId,
@@ -62,9 +85,9 @@ public static class UserAccessSql
             ul.CanApprovePlan,
             ul.CanUsePekara,
             ul.CanUsePecenjara,
-            CAST(0 AS bit) AS CanUsePijara,
-            CAST(NULL AS NVARCHAR(64)) AS PekaraOvenType,
-            CAST(NULL AS NVARCHAR(64)) AS PecenjaraOvenType
+            ul.CanUsePijara,
+            ul.PekaraOvenType,
+            ul.PecenjaraOvenType
         FROM dbo.UserLocations ul
         INNER JOIN dbo.Locations l ON l.LocationId = ul.LocationId
         WHERE ul.UserId = @UserId
@@ -86,7 +109,10 @@ public static class UserAccessSql
             CanViewReports,
             CanApprovePlan,
             CanUsePekara,
-            CanUsePecenjara
+            CanUsePecenjara,
+            CanUsePijara,
+            PekaraOvenType,
+            PecenjaraOvenType
         )
         VALUES (
             @UserId,
@@ -97,7 +123,25 @@ public static class UserAccessSql
             @CanViewReports,
             @CanApprovePlan,
             @CanUsePekara,
-            @CanUsePecenjara
+            @CanUsePecenjara,
+            @CanUsePijara,
+            @PekaraOvenType,
+            @PecenjaraOvenType
         );
+        """;
+
+    public const string AuthenticateUser = """
+        SELECT TOP (1)
+            u.UserId,
+            u.Username,
+            u.FullName,
+            r.Code AS RoleCode,
+            u.DefaultLocationId,
+            u.IsActive
+        FROM dbo.Users u
+        INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
+        WHERE u.Username = @Username
+          AND u.PasswordHash = @Password
+          AND u.IsActive = 1;
         """;
 }

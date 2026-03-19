@@ -1,39 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useBatches, useItems, usePlans, useUserLocations, useWasteEntries } from "../lib/queries";
-import type { Item } from "../lib/types";
+import { useBatches, useCreateOperatorEntry, useItems, usePlans, useUserLocations, useWasteEntries } from "../lib/queries";
+import { createLocalId, queuePendingOperatorEntry, shouldQueueOffline } from "../lib/operatorEntryQueue";
+import type { CreateOperatorEntryRequest, Item, OperatorEntryLine } from "../lib/types";
 
 type EntryMode = "pekara" | "pecenjara" | "pijara";
-
-type OperatorEntryLine = {
-  itemName: string;
-  quantity: number;
-  classB: boolean;
-  classBQuantity: number;
-};
-
-type OperatorEntry = {
-  id: string;
-  mode: EntryMode;
-  locationId: number;
-  locationName: string;
-  items: OperatorEntryLine[];
-  note: string;
-  photoDataUrl: string;
-  photoName: string;
-  createdAt: string;
-};
-
-const STORAGE_KEY = "pecenje-operator-entries";
-
-function createEntryId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 export function ProductionPage() {
   const { user } = useAuth();
@@ -41,15 +13,16 @@ export function ProductionPage() {
   const wasteQuery = useWasteEntries();
   const itemsQuery = useItems();
   const plansQuery = usePlans();
+  const createEntryMutation = useCreateOperatorEntry();
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
-  const [entries, setEntries] = useState<OperatorEntry[]>([]);
   const [draft, setDraft] = useState({ note: "", photoDataUrl: "", photoName: "" });
   const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([
-    { itemName: "", quantity: 10, classB: false, classBQuantity: 0 }
+    { itemName: "", quantity: 10, classB: true, classBQuantity: 10 }
   ]);
   const [itemSearch, setItemSearch] = useState<string[]>([""]);
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
   const itemReady = draftItems.some((entry) => Boolean(entry.itemName));
   const quantityReady = draftItems.every(
@@ -84,53 +57,6 @@ export function ProductionPage() {
       pijara: Boolean(permission?.canBake && permission.canUsePijara)
     };
   }, [activeLocation, permissionsQuery.data]);
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as Array<
-        OperatorEntry | (Omit<OperatorEntry, "items"> & { itemName?: string; quantity?: number })
-      >;
-      setEntries(
-        parsed.map((entry) => {
-          if ("items" in entry && Array.isArray(entry.items)) {
-            return {
-              ...entry,
-              items: entry.items.map((line) => ({
-                itemName: line.itemName,
-                quantity: line.quantity,
-                classB: "classB" in line ? Boolean(line.classB) : false,
-                classBQuantity: "classBQuantity" in line ? Number(line.classBQuantity) || 0 : 0
-              }))
-            };
-          }
-
-          const legacyEntry = entry as Omit<OperatorEntry, "items"> & {
-            itemName?: string;
-            quantity?: number;
-          };
-
-          return {
-            ...legacyEntry,
-            items: [
-              {
-                itemName: legacyEntry.itemName ?? "Непознат артикал",
-                quantity: legacyEntry.quantity ?? 0,
-                classB: false,
-                classBQuantity: 0
-              }
-            ]
-          };
-        })
-      );
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -328,10 +254,10 @@ export function ProductionPage() {
               <span>Работна локација: {activeLocation?.locationName}</span>
               {selectedMode === "pijara" ? (
                 <>
-                  <span>1. Сликај го артикалот што го пријавуваш.</span>
-                  <span>2. Додади еден или повеќе артикли.</span>
-                  <span>3. За секој артикал означи дали е Класа Б.</span>
-                  <span>4. Внеси количина и количина за Класа Б, па сними.</span>
+                  <span>1. Една пријава е една слика. Без слика не може да се сними.</span>
+                  <span>2. Избери артикал. Под артикалот се прикажува неговата шифра, само за идентификација.</span>
+                  <span>3. Поле „Количина“ е вкупната пријавена количина за тој артикал.</span>
+                  <span>4. Поле „Класа Б“ е по default вклучено и „Количина за Класа Б“ е количината што оди во Класа Б.</span>
                 </>
               ) : (
                 <>
@@ -364,6 +290,8 @@ export function ProductionPage() {
                 <span>{saveConfirmation}</span>
               </div>
             )}
+
+            {saveError && <div className="form-error">{saveError}</div>}
 
             <div className="operator-step-grid">
               <article className={`operator-step-card${photoReady ? " operator-step-card--done" : ""}`}>
@@ -454,7 +382,7 @@ export function ProductionPage() {
                             ))}
                         </select>
                         <span className="meta">
-                          Шифра: {availableItems.find((item) => item.nameMk === entry.itemName)?.code ?? "-"}
+                          Артикал шифра: {availableItems.find((item) => item.nameMk === entry.itemName)?.code ?? "-"}
                         </span>
                         <input
                           type="number"
@@ -468,7 +396,7 @@ export function ProductionPage() {
                               )
                             );
                           }}
-                          placeholder="Количина"
+                          placeholder={selectedMode === "pijara" ? "Вкупна количина" : "Количина"}
                         />
                         {selectedMode === "pijara" && (
                           <>
@@ -487,7 +415,7 @@ export function ProductionPage() {
                                   );
                                 }}
                               />
-                              <span>Класа Б</span>
+                              <span>Класа Б пријава</span>
                             </label>
                             <input
                               type="number"
@@ -503,7 +431,7 @@ export function ProductionPage() {
                                   )
                                 );
                               }}
-                              placeholder="Кол. Класа Б"
+                              placeholder="Количина за Класа Б"
                               disabled={!entry.classB}
                             />
                           </>
@@ -530,7 +458,12 @@ export function ProductionPage() {
                       const fallbackItem = availableItems[0]?.nameMk ?? "";
                       setDraftItems((current) => [
                         ...current,
-                        { itemName: fallbackItem, quantity: 10, classB: false, classBQuantity: 0 }
+                        {
+                          itemName: fallbackItem,
+                          quantity: 10,
+                          classB: selectedMode === "pijara",
+                          classBQuantity: selectedMode === "pijara" ? 10 : 0
+                        }
                       ]);
                       setItemSearch((current) => [...current, fallbackItem]);
                     }}
@@ -568,8 +501,9 @@ export function ProductionPage() {
                         return;
                       }
 
-                      const nextEntry: OperatorEntry = {
-                        id: createEntryId(),
+                      setSaveError(null);
+
+                      const nextEntry: CreateOperatorEntryRequest = {
                         mode: selectedMode,
                         locationId: activeLocation?.locationId ?? 0,
                         locationName: activeLocation?.locationName ?? "Непозната локација",
@@ -579,67 +513,54 @@ export function ProductionPage() {
                         photoName: draft.photoName,
                         createdAt: new Date().toLocaleString("mk-MK")
                       };
-                      const next = [nextEntry, ...entries];
-                      setEntries(next);
-                      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-                      setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                      setDraftItems([
-                        {
-                          itemName: availableItems[0]?.nameMk ?? "",
-                          quantity: 10,
-                          classB: false,
-                          classBQuantity: 0
+                      createEntryMutation.mutate(nextEntry, {
+                        onSuccess: () => {
+                          setDraft({ note: "", photoDataUrl: "", photoName: "" });
+                          setDraftItems([
+                            {
+                              itemName: availableItems[0]?.nameMk ?? "",
+                              quantity: 10,
+                              classB: selectedMode === "pijara",
+                              classBQuantity: selectedMode === "pijara" ? 10 : 0
+                            }
+                          ]);
+                          setItemSearch([availableItems[0]?.nameMk ?? ""]);
+                          triggerSuccessFeedback("Успешен внес");
+                          setSaveConfirmation(
+                            `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
+                          );
+                        },
+                        onError: (error) => {
+                          if (shouldQueueOffline(error)) {
+                            queuePendingOperatorEntry({
+                              ...nextEntry,
+                              localId: createLocalId()
+                            });
+                            setDraft({ note: "", photoDataUrl: "", photoName: "" });
+                            setDraftItems([
+                              {
+                                itemName: availableItems[0]?.nameMk ?? "",
+                                quantity: 10,
+                                classB: selectedMode === "pijara",
+                                classBQuantity: selectedMode === "pijara" ? 10 : 0
+                              }
+                            ]);
+                            setItemSearch([availableItems[0]?.nameMk ?? ""]);
+                            triggerSuccessFeedback("Снимено локално");
+                            setSaveConfirmation("Нема интернет. Внесот е снимен локално и ќе се испрати автоматски.");
+                            return;
+                          }
+
+                          setSaveError("Неуспешен внес. Провери дали интернетот и серверот работат, па пробај повторно. Ако проблемот остане, контактирај администратор.");
+                          triggerErrorFeedback("Неуспешен внес");
                         }
-                      ]);
-                      setItemSearch([availableItems[0]?.nameMk ?? ""]);
-                      triggerSuccessFeedback();
-                      setSaveConfirmation(
-                        `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
-                      );
+                      });
                     }}
                   >
-                    Сними внес
+                    {createEntryMutation.isPending ? "Се снима..." : "Сними внес"}
                   </button>
                 </article>
               )}
-            </div>
-          </section>
-        )}
-
-        {selectedMode && (
-          <section className="panel">
-            <div className="panel-header">
-              <h3>Последни внесови</h3>
-            </div>
-
-            <div className="card-list">
-              {entries
-                .filter((entry) => !selectedMode || entry.mode === selectedMode)
-                .map((entry) => (
-                  <article className="workflow-card" key={entry.id}>
-                    <div className="workflow-card__top">
-                      <span className="pill">
-                        {entry.mode === "pekara" ? "Пекара" : entry.mode === "pecenjara" ? "Печењара" : "Пијара"}
-                      </span>
-                      <span className="meta">{entry.createdAt}</span>
-                    </div>
-                    <p>Локација: {entry.locationName}</p>
-                    <h4>{entry.items.map((line) => line.itemName).join(", ")}</h4>
-                    <div className="operator-saved-lines">
-                      {entry.items.map((line) => (
-                        <span key={`${entry.id}-${line.itemName}`}>
-                          {line.itemName}: {line.quantity}
-                          {entry.mode === "pijara" && line.classB ? ` · Класа Б: ${line.classBQuantity}` : ""}
-                        </span>
-                      ))}
-                    </div>
-                    <p>Забелешка: {entry.note || "Нема"}</p>
-                    <p>Слика: {entry.photoName || "Прикачена"}</p>
-                    <div className="operator-photo-preview operator-photo-preview--small">
-                      <img src={entry.photoDataUrl} alt={`Слика за ${entry.items.map((line) => line.itemName).join(", ")}`} />
-                    </div>
-                  </article>
-                ))}
             </div>
           </section>
         )}
@@ -728,10 +649,12 @@ function fileToDataUrl(file: File) {
   });
 }
 
-function triggerSuccessFeedback() {
+function triggerSuccessFeedback(message = "Успешен внес") {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
     navigator.vibrate?.([120, 40, 120]);
   }
+
+  speakFeedback(message);
 
   if (typeof window === "undefined") {
     return;
@@ -762,5 +685,60 @@ function triggerSuccessFeedback() {
     };
   } catch {
     // Ignore audio feedback failures and keep save flow successful.
+  }
+}
+
+function triggerErrorFeedback(message = "Неуспешен внес") {
+  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+    navigator.vibrate?.([220, 80, 220, 80, 220]);
+  }
+
+  speakFeedback(message);
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextConstructor) {
+    return;
+  }
+
+  try {
+    const audioContext = new AudioContextConstructor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.15, audioContext.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.36);
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  } catch {
+    // Ignore audio feedback failures.
+  }
+}
+
+function speakFeedback(message: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return;
+  }
+
+  try {
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "mk-MK";
+    utterance.rate = 1;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    // Ignore speech synthesis failures.
   }
 }

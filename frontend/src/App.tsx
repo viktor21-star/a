@@ -14,6 +14,8 @@ import { UserAccessPage } from "./pages/UserAccessPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { HomePage } from "./pages/HomePage";
 import { VersionPolicyPage } from "./pages/VersionPolicyPage";
+import { TermsPage } from "./pages/TermsPage";
+import { ReasonsPage } from "./pages/ReasonsPage";
 
 export function App() {
   return (
@@ -36,6 +38,8 @@ export function App() {
         <Route path="master-data/locations" element={<LocationsPage />} />
         <Route path="master-data/items" element={<ItemsPage />} />
         <Route path="master-data/ovens" element={<OvensPage />} />
+        <Route path="master-data/terms" element={<TermsPage />} />
+        <Route path="master-data/reasons" element={<ReasonsPage />} />
         <Route path="user-access" element={<UserAccessPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="version-policy" element={<VersionPolicyPage />} />

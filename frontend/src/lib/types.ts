@@ -61,6 +61,38 @@ export type BatchDetail = {
   endTime?: string | null;
 };
 
+export type OperatorEntryLine = {
+  itemName: string;
+  quantity: number;
+  classB: boolean;
+  classBQuantity: number;
+};
+
+export type OperatorEntry = {
+  id: string;
+  mode: "pekara" | "pecenjara" | "pijara";
+  locationId: number;
+  locationName: string;
+  items: OperatorEntryLine[];
+  note: string;
+  photoDataUrl: string;
+  photoName: string;
+  createdAt: string;
+  userId: number;
+  operatorName: string;
+};
+
+export type CreateOperatorEntryRequest = {
+  mode: "pekara" | "pecenjara" | "pijara";
+  locationId: number;
+  locationName: string;
+  items: OperatorEntryLine[];
+  note: string;
+  photoDataUrl: string;
+  photoName: string;
+  createdAt: string;
+};
+
 export type WasteEntry = {
   wasteEntryId: number;
   locationId: number;
@@ -121,6 +153,45 @@ export type Location = {
   nameMk: string;
   regionCode: string;
   isActive: boolean;
+};
+
+export type OvenModeConfig = {
+  ovenType: string;
+  ovenCount: number;
+  ovenCapacity: number;
+};
+
+export type LocationOvenConfig = {
+  locationId: number;
+  pekara: OvenModeConfig;
+  pecenjara: OvenModeConfig;
+};
+
+export type UpdateLocationOvensRequest = {
+  locations: LocationOvenConfig[];
+};
+
+export type TermEntry = {
+  id: string;
+  label: string;
+  time: string;
+  isActive: boolean;
+};
+
+export type UpdateTermsRequest = {
+  terms: TermEntry[];
+};
+
+export type ReasonEntry = {
+  id: string;
+  code: string;
+  name: string;
+  category: "разлика" | "отпад" | "доцнење";
+  isActive: boolean;
+};
+
+export type UpdateReasonsRequest = {
+  reasons: ReasonEntry[];
 };
 
 export type Item = {
@@ -187,6 +258,11 @@ export type CreateUserRequest = {
   canUsePijara: boolean;
   pekaraOvenType: string;
   pecenjaraOvenType: string;
+};
+
+export type UpdateUserAccountRequest = {
+  isActive: boolean;
+  newPassword?: string;
 };
 
 export type UserLocationPermission = {
