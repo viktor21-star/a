@@ -59,11 +59,28 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      - name: Resolve release APK path
+        id: resolve_apk
+        run: |
+          set -eu
+          RELEASE_DIR="frontend/android/app/build/outputs/apk/release"
+          if [ -f "$RELEASE_DIR/app-release.apk" ]; then
+            APK_PATH="$RELEASE_DIR/app-release.apk"
+          elif [ -f "$RELEASE_DIR/app-release-unsigned.apk" ]; then
+            APK_PATH="$RELEASE_DIR/app-release-unsigned.apk"
+          else
+            echo "No release APK found in $RELEASE_DIR"
+            ls -la "$RELEASE_DIR" || true
+            exit 1
+          fi
+          cp "$APK_PATH" "$RELEASE_DIR/pecenje-release.apk"
+          echo "apk_path=$RELEASE_DIR/pecenje-release.apk" >> "$GITHUB_OUTPUT"
+
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: pecenje-release-apk
-          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          path: ${{ steps.resolve_apk.outputs.apk_path }}
           if-no-files-found: error
 
       - name: Publish APK to stable GitHub release
@@ -73,5 +90,5 @@ jobs:
           name: Latest Release APK
           prerelease: true
           make_latest: false
-          files: frontend/android/app/build/outputs/apk/release/app-release.apk
+          files: ${{ steps.resolve_apk.outputs.apk_path }}
           overwrite_files: true
