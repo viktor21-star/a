@@ -92,25 +92,36 @@ export function ProductionPage() {
         OperatorEntry | (Omit<OperatorEntry, "items"> & { itemName?: string; quantity?: number })
       >;
       setEntries(
-        parsed.map((entry) => ({
-          ...entry,
-          items:
-            "items" in entry && Array.isArray(entry.items)
-              ? entry.items.map((line) => ({
-                  itemName: line.itemName,
-                  quantity: line.quantity,
-                  classB: "classB" in line ? Boolean(line.classB) : false,
-                  classBQuantity: "classBQuantity" in line ? Number(line.classBQuantity) || 0 : 0
-                }))
-              : [
-                  {
-                    itemName: entry.itemName ?? "Непознат артикал",
-                    quantity: entry.quantity ?? 0,
-                    classB: false,
-                    classBQuantity: 0
-                  }
-                ]
-        }))
+        parsed.map((entry) => {
+          if ("items" in entry && Array.isArray(entry.items)) {
+            return {
+              ...entry,
+              items: entry.items.map((line) => ({
+                itemName: line.itemName,
+                quantity: line.quantity,
+                classB: "classB" in line ? Boolean(line.classB) : false,
+                classBQuantity: "classBQuantity" in line ? Number(line.classBQuantity) || 0 : 0
+              }))
+            };
+          }
+
+          const legacyEntry = entry as Omit<OperatorEntry, "items"> & {
+            itemName?: string;
+            quantity?: number;
+          };
+
+          return {
+            ...legacyEntry,
+            items: [
+              {
+                itemName: legacyEntry.itemName ?? "Непознат артикал",
+                quantity: legacyEntry.quantity ?? 0,
+                classB: false,
+                classBQuantity: 0
+              }
+            ]
+          };
+        })
       );
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
