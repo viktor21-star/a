@@ -1,0 +1,16 @@
+[Unit]
+Description=Pecenje backend and web frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zitomarketi/Desktop/Pecenje app
+ExecStartPre=/bin/bash -lc '"/home/zitomarketi/Desktop/Pecenje app/scripts/build_frontend_public.sh"'
+ExecStart=/bin/bash -lc 'cd "/home/zitomarketi/Desktop/Pecenje app/backend/Pecenje.Api" && /usr/bin/dotnet run --urls "http://0.0.0.0:8081"'
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Development
+
+[Install]
+WantedBy=default.target

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { syncPendingOperatorEntries } from "../lib/operatorEntryQueue";
+import { syncPendingOperatorEntries, syncPendingWasteEntries } from "../lib/operatorEntryQueue";
 
 export function AppShell() {
   const { mode, toggle } = useTheme();
@@ -14,9 +14,11 @@ export function AppShell() {
 
   useEffect(() => {
     void syncPendingOperatorEntries();
+    void syncPendingWasteEntries();
 
     const handleOnline = () => {
       void syncPendingOperatorEntries();
+      void syncPendingWasteEntries();
     };
 
     window.addEventListener("online", handleOnline);

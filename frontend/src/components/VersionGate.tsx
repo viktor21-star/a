@@ -55,7 +55,7 @@ export function VersionGate({ children }: PropsWithChildren) {
           <p>Провери ја API адресата. Ако backend-от е на друга IP, внеси ја точната адреса и пробај пак.</p>
 
           <div className="master-form">
-            <input value={apiUrl} onChange={(event) => setApiUrl(event.target.value)} placeholder="http://192.168.11.40:8081/api/v1" />
+            <input value={apiUrl} onChange={(event) => setApiUrl(event.target.value)} placeholder="https://app.superpetka.com/api/v1" />
             <button
               className="action-button"
               type="button"

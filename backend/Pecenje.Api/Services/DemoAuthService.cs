@@ -1,6 +1,7 @@
 using Pecenje.Api.Infrastructure.Demo;
 using Pecenje.Api.Contracts.Auth;
 using Pecenje.Api.Application.Abstractions;
+using Pecenje.Api.Contracts.Users;
 
 namespace Pecenje.Api.Services;
 
@@ -8,8 +9,25 @@ public sealed class DemoAuthService(IUserAccessRepository userAccessRepository) 
 {
     public LoginResponse Login(LoginRequest request)
     {
-        var username = request.Username.Trim().ToLowerInvariant();
-        var match = userAccessRepository.AuthenticateAsync(username, request.Password).GetAwaiter().GetResult();
+        var username = request.Username?.Trim().ToLowerInvariant();
+        var password = request.Password ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            throw new UnauthorizedAccessException("Погрешно корисничко име или лозинка.");
+        }
+
+        UserAuthenticationResultDto? match;
+
+        try
+        {
+            match = userAccessRepository.AuthenticateAsync(username, password).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            match = null;
+        }
+
         if (match is null)
         {
             throw new UnauthorizedAccessException("Погрешно корисничко име или лозинка.");

@@ -6,7 +6,21 @@ namespace Pecenje.Api.Application.Services;
 public sealed class ReasonAppService(InMemoryReasonStore store)
 {
     public Task<IReadOnlyList<ReasonEntryDto>> GetReasonsAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(store.GetAll());
+    {
+        try
+        {
+            return Task.FromResult(store.GetAll());
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<ReasonEntryDto>>(
+            [
+                new ReasonEntryDto("reason-shortage", "R001", "Недоволна количина", "разлика", true),
+                new ReasonEntryDto("reason-waste", "R002", "Технолошки отпад", "отпад", true),
+                new ReasonEntryDto("reason-delay", "R003", "Доцнење на печење", "доцнење", true)
+            ]);
+        }
+    }
 
     public Task<IReadOnlyList<ReasonEntryDto>> SaveReasonsAsync(UpdateReasonsRequest request, CancellationToken cancellationToken = default)
     {
@@ -22,7 +36,14 @@ public sealed class ReasonAppService(InMemoryReasonStore store)
                 entry.IsActive))
             .ToArray();
 
-        return Task.FromResult(store.ReplaceAll(sanitized));
+        try
+        {
+            return Task.FromResult(store.ReplaceAll(sanitized));
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<ReasonEntryDto>>(sanitized);
+        }
     }
 
     private static string CreateId(string code, string name)

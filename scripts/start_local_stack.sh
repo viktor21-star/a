@@ -20,7 +20,7 @@ fi
 
 echo "[1/2] Building frontend..."
 cd "$FRONTEND_DIR"
-VITE_API_BASE_URL="http://$LAN_IP:8081/api/v1" npm run build
+VITE_API_BASE_URL="http://192.168.11.40:8081/api/v1" npm run build
 
 echo "[2/2] Starting backend on http://0.0.0.0:8081 ..."
 cd "$BACKEND_DIR"

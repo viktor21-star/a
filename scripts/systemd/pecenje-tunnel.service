@@ -1,0 +1,14 @@
+[Unit]
+Description=Pecenje Cloudflare tunnel
+After=network-online.target pecenje-backend.service
+Wants=network-online.target pecenje-backend.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/zitomarketi
+ExecStart=/bin/bash -lc '/usr/bin/cloudflared tunnel --protocol http2 run pecenje-app'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

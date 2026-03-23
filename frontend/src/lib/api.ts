@@ -1,5 +1,22 @@
-const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.11.40:8081/api/v1";
 const API_BASE_STORAGE_KEY = "pecenje-api-base-url";
+
+function resolveDefaultApiBase() {
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, origin } = window.location;
+    const isTunnelOrRemoteWebOrigin =
+      (protocol === "http:" || protocol === "https:") &&
+      hostname !== "localhost" &&
+      hostname !== "127.0.0.1" &&
+      !hostname.startsWith("192.168.");
+    if (isTunnelOrRemoteWebOrigin) {
+      return `${origin}/api/v1`;
+    }
+  }
+
+  return import.meta.env.VITE_API_BASE_URL ?? "https://app.superpetka.com/api/v1";
+}
+
+const DEFAULT_API_BASE = resolveDefaultApiBase();
 
 export function getApiBaseUrl() {
   const stored = window.localStorage.getItem(API_BASE_STORAGE_KEY);
@@ -7,7 +24,16 @@ export function getApiBaseUrl() {
     return DEFAULT_API_BASE;
   }
 
-  if (stored.includes("127.0.0.1:8081") || stored.includes("localhost:8081")) {
+  if (
+    stored.includes("127.0.0.1:8081") ||
+    stored.includes("localhost:8081") ||
+    stored.includes("192.168.11.40:8081") ||
+    stored.includes("127.0.0.1:1880") ||
+    stored.includes("localhost:1880") ||
+    stored.includes("192.168.11.40:1880") ||
+    stored.includes("5.32.180.30:1880") ||
+    stored.includes(".trycloudflare.com/api/v1")
+  ) {
     window.localStorage.setItem(API_BASE_STORAGE_KEY, DEFAULT_API_BASE);
     return DEFAULT_API_BASE;
   }

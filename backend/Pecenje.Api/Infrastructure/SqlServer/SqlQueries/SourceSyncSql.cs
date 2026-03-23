@@ -51,6 +51,21 @@ public static class SourceSyncSql
         ELSE IF COL_LENGTH('dbo.katart', 'NazivGrupa') IS NOT NULL SET @fallbackGroupNameColumn = 'NazivGrupa';
         ELSE IF COL_LENGTH('dbo.katart', 'GrupaNaziv') IS NOT NULL SET @fallbackGroupNameColumn = 'GrupaNaziv';
 
+        DECLARE @optItemColumn nvarchar(128) = NULL;
+        DECLARE @optLocationColumn nvarchar(128) = NULL;
+
+        IF OBJECT_ID('dbo.optzalpooe') IS NOT NULL
+        BEGIN
+            IF COL_LENGTH('dbo.optzalpooe', 'Sifra_Art') IS NOT NULL SET @optItemColumn = 'Sifra_Art';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'SifArt') IS NOT NULL SET @optItemColumn = 'SifArt';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'Artikal') IS NOT NULL SET @optItemColumn = 'Artikal';
+
+            IF COL_LENGTH('dbo.optzalpooe', 'Sifra_Oe') IS NOT NULL SET @optLocationColumn = 'Sifra_Oe';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'SifOe') IS NOT NULL SET @optLocationColumn = 'SifOe';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'OrgEd') IS NOT NULL SET @optLocationColumn = 'OrgEd';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'Sifra_Org') IS NOT NULL SET @optLocationColumn = 'Sifra_Org';
+        END
+
         DECLARE @sql nvarchar(max) = N'
             SELECT
                 CAST(k.Sifra_Art AS nvarchar(100)) AS SourceItemId,
@@ -71,11 +86,21 @@ public static class SourceSyncSql
                     ELSE N'CAST(''Некатегоризирано'' AS nvarchar(100))'
                   END + N' AS GroupName,
                 CAST(0 AS decimal(18,2)) AS SalesPrice,
-                CAST(1 AS bit) AS IsActive
+                CAST(1 AS bit) AS IsActive,
+                ' + CASE
+                    WHEN @optItemColumn IS NOT NULL AND @optLocationColumn IS NOT NULL
+                      THEN N'CAST(o.' + QUOTENAME(@optLocationColumn) + N' AS nvarchar(50))'
+                    ELSE N'CAST(NULL AS nvarchar(50))'
+                  END + N' AS AllowedLocationCode
             FROM dbo.katart k ' +
             CASE
               WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL
                 THEN N'LEFT JOIN dbo.podgrupi p ON CAST(k.' + QUOTENAME(@subgroupColumn) + N' AS nvarchar(50)) = CAST(p.' + QUOTENAME(@podgrupiSubgroupColumn) + N' AS nvarchar(50)) '
+              ELSE N''
+            END +
+            CASE
+              WHEN @optItemColumn IS NOT NULL AND @optLocationColumn IS NOT NULL
+                THEN N'LEFT JOIN dbo.optzalpooe o ON CAST(k.Sifra_Art AS nvarchar(50)) = CAST(o.' + QUOTENAME(@optItemColumn) + N' AS nvarchar(50)) '
               ELSE N''
             END +
             N'ORDER BY k.ImeArt;';

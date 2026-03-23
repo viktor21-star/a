@@ -134,5 +134,42 @@ public sealed class LocalAppDb
                 PRIMARY KEY (UserId, LocationId)
             );
             """);
+
+        EnsureColumn(connection, "LocalUsers", "DefaultLocationId", "INTEGER NULL");
+        EnsureColumn(connection, "LocalUserLocations", "CanRecordWaste", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "LocalUserLocations", "CanUsePekara", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "LocalUserLocations", "CanUsePecenjara", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "LocalUserLocations", "CanUsePijara", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(connection, "LocalUserLocations", "PekaraOvenType", "TEXT NULL");
+        EnsureColumn(connection, "LocalUserLocations", "PecenjaraOvenType", "TEXT NULL");
+        EnsureColumn(connection, "WasteEntries", "SourceMode", "TEXT NOT NULL DEFAULT 'pekara'");
+        EnsureColumn(connection, "WasteEntries", "Note", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "WasteEntries", "PhotoDataUrl", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "WasteEntries", "PhotoName", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "WasteEntries", "CreatedAt", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "WasteEntries", "OperatorName", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void EnsureColumn(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName})";
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var ordinal = reader.GetOrdinal("name");
+                columns.Add(reader.GetString(ordinal));
+            }
+        }
+
+        if (columns.Contains(columnName))
+        {
+            return;
+        }
+
+        connection.Execute($"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}");
     }
 }

@@ -8,7 +8,9 @@ namespace Pecenje.Api.Application.Services;
 public sealed class MasterDataAppService(
     IMasterDataRepository repository,
     ISourceMasterDataReader sourceReader,
-    IAuditService auditService)
+    IAuditService auditService,
+    ICurrentUserProvider currentUserProvider,
+    IUserAccessRepository userAccessRepository)
 {
     public async Task<IReadOnlyList<LocationDto>> GetLocationsAsync(CancellationToken cancellationToken = default)
     {
@@ -36,17 +38,38 @@ public sealed class MasterDataAppService(
         }
 
         var sourceRows = await sourceReader.ReadItemsAsync(cancellationToken);
-        return sourceRows
-            .Select((row, index) => new ItemDto(
-                ParseId(row.SourceItemId, index + 1),
+        var hasLocationRules = sourceRows.Any(row => !string.IsNullOrWhiteSpace(row.AllowedLocationCode));
+        var activeLocationCode = hasLocationRules
+            ? await TryResolveCurrentLocationCodeAsync(cancellationToken)
+            : null;
+
+        var groupedRows = sourceRows
+            .GroupBy(row => new
+            {
+                row.SourceItemId,
                 row.Code,
-                NormalizeDisplayText(row.NameMk),
+                row.NameMk,
                 row.GroupCode,
-                NormalizeGroupName(row.GroupCode, row.GroupName),
+                row.GroupName,
                 row.SalesPrice,
+                row.IsActive
+            })
+            .Where(group =>
+                !hasLocationRules ||
+                string.IsNullOrWhiteSpace(activeLocationCode) ||
+                group.Any(row => string.Equals(row.AllowedLocationCode?.Trim(), activeLocationCode, StringComparison.OrdinalIgnoreCase)))
+            .Select((group, index) => new ItemDto(
+                ParseId(group.Key.SourceItemId, index + 1),
+                group.Key.Code,
+                NormalizeDisplayText(group.Key.NameMk),
+                group.Key.GroupCode,
+                NormalizeGroupName(group.Key.GroupCode, group.Key.GroupName),
+                group.Key.SalesPrice,
                 5,
-                row.IsActive))
+                group.Key.IsActive))
             .ToArray();
+
+        return groupedRows;
     }
 
     public async Task<LocationDto> CreateLocationAsync(UpsertLocationRequest request, CancellationToken cancellationToken = default)
@@ -101,6 +124,36 @@ public sealed class MasterDataAppService(
 
     private static int ParseId(string value, int fallback)
         => int.TryParse(value, out var parsed) ? parsed : fallback;
+
+    private async Task<string?> TryResolveCurrentLocationCodeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var userId = currentUserProvider.GetCurrentUserId();
+            var user = (await userAccessRepository.GetUsersAsync(cancellationToken)).FirstOrDefault(entry => entry.UserId == userId);
+            if (user?.RoleCode != "operator")
+            {
+                return null;
+            }
+
+            var locations = await userAccessRepository.GetUserLocationsAsync(userId, cancellationToken);
+            var activeLocationId = locations.FirstOrDefault(entry =>
+                    entry.CanBake || entry.CanUsePekara || entry.CanUsePecenjara || entry.CanUsePijara)
+                ?.LocationId
+                ?? locations.FirstOrDefault()?.LocationId;
+
+            if (activeLocationId is null)
+            {
+                return null;
+            }
+
+            return activeLocationId.Value.ToString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static string NormalizeGroupName(string? groupCode, string? groupName)
     {

@@ -31,6 +31,32 @@ import type {
   WasteEntry
 } from "./types";
 
+function createCachedQuery<T>(queryKey: string, fetcher: () => Promise<ApiEnvelope<T>>) {
+  const storageKey = `pecenje-cache-${queryKey}`;
+
+  return async () => {
+    try {
+      const response = await fetcher();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(storageKey, JSON.stringify(response));
+      }
+      return response;
+    } catch (error) {
+      if (typeof window !== "undefined") {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          try {
+            return JSON.parse(raw) as ApiEnvelope<T>;
+          } catch {
+          }
+        }
+      }
+
+      throw error;
+    }
+  };
+}
+
 export function useDashboardOverview() {
   return useQuery({
     queryKey: ["dashboard-overview"],
@@ -147,14 +173,14 @@ export function useExportPlanVsActualPdf() {
 export function useLocations() {
   return useQuery({
     queryKey: ["locations"],
-    queryFn: () => api.getLocations<ApiEnvelope<Location[]>>()
+    queryFn: createCachedQuery("locations", () => api.getLocations<ApiEnvelope<Location[]>>())
   });
 }
 
 export function useItems() {
   return useQuery({
     queryKey: ["items"],
-    queryFn: () => api.getItems<ApiEnvelope<Item[]>>()
+    queryFn: createCachedQuery("items", () => api.getItems<ApiEnvelope<Item[]>>())
   });
 }
 
@@ -179,7 +205,7 @@ export function useUpdateLocationOvens() {
 export function useTerms() {
   return useQuery({
     queryKey: ["terms"],
-    queryFn: () => api.getTerms<ApiEnvelope<TermEntry[]>>()
+    queryFn: createCachedQuery("terms", () => api.getTerms<ApiEnvelope<TermEntry[]>>())
   });
 }
 
@@ -197,7 +223,7 @@ export function useUpdateTerms() {
 export function useReasons() {
   return useQuery({
     queryKey: ["reasons"],
-    queryFn: () => api.getReasons<ApiEnvelope<ReasonEntry[]>>()
+    queryFn: createCachedQuery("reasons", () => api.getReasons<ApiEnvelope<ReasonEntry[]>>())
   });
 }
 

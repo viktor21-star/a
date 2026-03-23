@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
 import { useBatches, useCreateOperatorEntry, useCreateWasteEntry, useItems, usePlans, useReasons, useUserLocations, useWasteEntries } from "../lib/queries";
-import { createLocalId, queuePendingOperatorEntry, shouldQueueOffline } from "../lib/operatorEntryQueue";
+import { createLocalId, queuePendingOperatorEntry, queuePendingWasteEntry, shouldQueueOffline } from "../lib/operatorEntryQueue";
 import type { CreateOperatorEntryRequest, CreateWasteEntryRequest, Item, OperatorEntryLine } from "../lib/types";
 
 type ItemMode = "pekara" | "pecenjara" | "pijara";
@@ -20,10 +20,8 @@ export function ProductionPage() {
   const permissionsQuery = useUserLocations(user?.id ?? null);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [draft, setDraft] = useState({ note: "", photoDataUrl: "", photoName: "" });
-  const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([
-    { itemName: "", quantity: 10, classB: true, classBQuantity: 10 }
-  ]);
-  const [itemSearch, setItemSearch] = useState<string[]>([""]);
+  const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([]);
+  const [itemSearch, setItemSearch] = useState("");
   const [wasteSource, setWasteSource] = useState<ItemMode | null>(null);
   const [wasteItemSearch, setWasteItemSearch] = useState("");
   const [wasteItemName, setWasteItemName] = useState("");
@@ -32,7 +30,7 @@ export function ProductionPage() {
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const photoReady = Boolean(draft.photoDataUrl);
-  const itemReady = draftItems.some((entry) => Boolean(entry.itemName));
+  const itemReady = draftItems.length > 0;
   const quantityReady = draftItems.every(
     (entry) =>
       !entry.itemName ||
@@ -43,6 +41,16 @@ export function ProductionPage() {
   );
   const effectiveItemMode = selectedMode === "waste" ? wasteSource : selectedMode;
   const availableItems = useMemo(() => filterItemsForMode(itemsQuery.data?.data ?? [], effectiveItemMode), [itemsQuery.data, effectiveItemMode]);
+  const filteredSelectableItems = useMemo(() => {
+    const query = itemSearch.trim().toLowerCase();
+    if (!query) {
+      return [];
+    }
+
+    return availableItems
+      .filter((item) => [item.nameMk, item.code].some((value) => value.toLowerCase().includes(query)))
+      .slice(0, 24);
+  }, [availableItems, itemSearch]);
   const wasteReasons = useMemo(
     () => (reasonsQuery.data?.data ?? []).filter((entry) => entry.isActive && entry.category === "отпад"),
     [reasonsQuery.data]
@@ -116,24 +124,7 @@ export function ProductionPage() {
     if (selectedMode === "waste") {
       return;
     }
-
-    const firstItem = availableItems[0]?.nameMk;
-    if (firstItem && !draftItems[0]?.itemName) {
-      setDraftItems((current) =>
-        current.map((entry, index) => (index === 0 ? { ...entry, itemName: firstItem } : entry))
-      );
-    }
-  }, [availableItems, draftItems]);
-
-  useEffect(() => {
-    if (selectedMode === "waste") {
-      return;
-    }
-
-    setItemSearch((current) =>
-      draftItems.map((entry, index) => current[index] ?? entry.itemName ?? "")
-    );
-  }, [draftItems]);
+  }, [availableItems, selectedMode]);
 
   useEffect(() => {
     if (selectedMode === "waste") {
@@ -145,21 +136,7 @@ export function ProductionPage() {
       return;
     }
 
-    if (!availableItems.length) {
-      return;
-    }
-
-    setDraftItems((current) =>
-      current.map((entry, index) => {
-        if (entry.itemName && availableItems.some((item) => item.nameMk === entry.itemName)) {
-          return entry;
-        }
-
-        return index === 0
-          ? { ...entry, itemName: availableItems[0]?.nameMk ?? "" }
-          : { ...entry, itemName: availableItems[0]?.nameMk ?? "" };
-      })
-    );
+    setDraftItems((current) => current.filter((entry) => availableItems.some((item) => item.nameMk === entry.itemName)));
   }, [availableItems, selectedMode]);
 
   useEffect(() => {
@@ -384,143 +361,155 @@ export function ProductionPage() {
                 <article className={`operator-step-card${itemReady ? " operator-step-card--done" : ""}`}>
                   <div className="operator-step-card__header">
                     <span className="pill">Чекор 2</span>
-                    <strong>{selectedMode === "pijara" ? "Додади артикли за пријава" : "Додади артикли за печење"}</strong>
+                    <strong>{selectedMode === "pijara" ? "Избери артикли за пријава" : "Избери артикли за печење"}</strong>
                   </div>
-                  <div className="operator-lines-grid">
-                    {draftItems.map((entry, index) => (
-                      <div className="operator-line-row" key={`${entry.itemName}-${index}`}>
-                        <input
-                          className="search-input"
-                          value={itemSearch[index] ?? ""}
-                          placeholder="Пребарај по име или шифра"
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            setItemSearch((current) =>
-                              current.map((value, valueIndex) => (valueIndex === index ? nextValue : value))
-                            );
-                          }}
-                        />
-                        <select
-                          value={entry.itemName}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            setDraftItems((current) =>
-                              current.map((line, lineIndex) =>
-                                lineIndex === index ? { ...line, itemName: nextValue } : line
-                              )
-                            );
-                            const selected = availableItems.find((item) => item.nameMk === nextValue);
-                            setItemSearch((current) =>
-                              current.map((value, valueIndex) =>
-                                valueIndex === index ? `${selected?.code ?? ""} ${nextValue}`.trim() : value
-                              )
-                            );
-                          }}
-                        >
-                          {availableItems
-                            .filter((item) => {
-                              const query = (itemSearch[index] ?? "").trim().toLowerCase();
-                              if (!query) {
-                                return true;
-                              }
+                  <input
+                    className="search-input"
+                    value={itemSearch}
+                    placeholder="Пребарај по име или шифра"
+                    onChange={(event) => setItemSearch(event.target.value)}
+                  />
+                  {!itemSearch.trim() ? (
+                    <div className="list-card">Внеси име или шифра за да ги видиш артиклите.</div>
+                  ) : filteredSelectableItems.length === 0 ? (
+                    <div className="list-card">Нема артикли што одговараат на пребарувањето.</div>
+                  ) : (
+                    <div className="operator-lines-grid">
+                      {filteredSelectableItems.map((item) => {
+                        const selectedItem = draftItems.some((entry) => entry.itemName === item.nameMk);
 
-                              return [item.nameMk, item.code].some((value) => value.toLowerCase().includes(query));
-                            })
-                            .map((item) => (
-                              <option key={item.itemId} value={item.nameMk}>
-                                {item.code} · {item.nameMk}
-                              </option>
-                            ))}
-                        </select>
-                        <span className="meta">
-                          Артикал шифра: {availableItems.find((item) => item.nameMk === entry.itemName)?.code ?? "-"}
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={entry.quantity}
-                          onChange={(event) => {
-                            const nextValue = Number(event.target.value);
-                            setDraftItems((current) =>
-                              current.map((line, lineIndex) =>
-                                lineIndex === index ? { ...line, quantity: nextValue } : line
-                              )
-                            );
-                          }}
-                          placeholder={selectedMode === "pijara" ? "Вкупна количина" : "Количина"}
-                        />
-                        {selectedMode === "pijara" && (
-                          <>
-                            <label className="operator-classb-toggle">
+                        return (
+                          <div className="operator-line-row operator-line-row--checkbox" key={item.itemId}>
+                            <label className="operator-item-toggle">
                               <input
                                 type="checkbox"
-                                checked={entry.classB}
+                                checked={selectedItem}
                                 onChange={(event) => {
                                   const checked = event.target.checked;
-                                  setDraftItems((current) =>
-                                    current.map((line, lineIndex) =>
-                                      lineIndex === index
-                                        ? { ...line, classB: checked, classBQuantity: checked ? Math.max(line.classBQuantity, 1) : 0 }
-                                        : line
-                                    )
-                                  );
+                                  setDraftItems((current) => {
+                                    if (checked) {
+                                      if (current.some((entry) => entry.itemName === item.nameMk)) {
+                                        return current;
+                                      }
+
+                                      return [
+                                        ...current,
+                                        {
+                                          itemName: item.nameMk,
+                                          quantity: 1,
+                                          classB: selectedMode === "pijara",
+                                          classBQuantity: selectedMode === "pijara" ? 1 : 0
+                                        }
+                                      ];
+                                    }
+
+                                    return current.filter((entry) => entry.itemName !== item.nameMk);
+                                  });
                                 }}
                               />
-                              <span>Класа Б пријава</span>
+                              <span>
+                                <strong>{item.nameMk}</strong>
+                                <small>Шифра: {item.code}</small>
+                              </span>
                             </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {draftItems.length > 0 && (
+                    <div className="operator-selected-items">
+                      <strong>Избрани артикли</strong>
+                      <div className="operator-lines-grid">
+                        {draftItems.map((entry) => (
+                          <div className="operator-line-row operator-line-row--checkbox" key={`selected-${entry.itemName}`}>
+                            <div className="operator-item-toggle">
+                              <span>
+                                <strong>{entry.itemName}</strong>
+                                <small>
+                                  Шифра: {availableItems.find((item) => item.nameMk === entry.itemName)?.code ?? "-"}
+                                </small>
+                              </span>
+                            </div>
                             <input
                               type="number"
                               min="0"
-                              value={entry.classB ? entry.classBQuantity : 0}
+                              value={entry.quantity}
                               onChange={(event) => {
                                 const nextValue = Number(event.target.value);
                                 setDraftItems((current) =>
-                                  current.map((line, lineIndex) =>
-                                    lineIndex === index
-                                      ? { ...line, classB: nextValue > 0 || line.classB, classBQuantity: nextValue }
-                                      : line
+                                  current.map((line) =>
+                                    line.itemName === entry.itemName ? { ...line, quantity: nextValue } : line
                                   )
                                 );
                               }}
-                              placeholder="Количина за Класа Б"
-                              disabled={!entry.classB}
+                              placeholder={selectedMode === "pijara" ? "Вкупна количина" : "Количина"}
                             />
-                          </>
-                        )}
-                        {draftItems.length > 1 && (
-                          <button
-                            className="ghost-button"
-                            type="button"
-                            onClick={() => {
-                              setDraftItems((current) => current.filter((_, lineIndex) => lineIndex !== index));
-                              setItemSearch((current) => current.filter((_, lineIndex) => lineIndex !== index));
-                            }}
-                          >
-                            Тргни
-                          </button>
-                        )}
+                            {selectedMode === "pijara" ? (
+                              <>
+                                <label className="operator-classb-toggle">
+                                  <input
+                                    type="checkbox"
+                                    checked={entry.classB}
+                                    onChange={(event) => {
+                                      const checked = event.target.checked;
+                                      setDraftItems((current) =>
+                                        current.map((line) =>
+                                          line.itemName === entry.itemName
+                                            ? { ...line, classB: checked, classBQuantity: checked ? Math.max(line.classBQuantity, 1) : 0 }
+                                            : line
+                                        )
+                                      );
+                                    }}
+                                  />
+                                  <span>Класа Б</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={entry.classB ? entry.classBQuantity : 0}
+                                  onChange={(event) => {
+                                    const nextValue = Number(event.target.value);
+                                    setDraftItems((current) =>
+                                      current.map((line) =>
+                                        line.itemName === entry.itemName
+                                          ? { ...line, classB: nextValue > 0 || line.classB, classBQuantity: nextValue }
+                                          : line
+                                      )
+                                    );
+                                  }}
+                                  placeholder="Количина за Класа Б"
+                                  disabled={!entry.classB}
+                                />
+                              </>
+                            ) : (
+                              <button
+                                className="ghost-button"
+                                type="button"
+                                onClick={() => {
+                                  setDraftItems((current) => current.filter((line) => line.itemName !== entry.itemName));
+                                }}
+                              >
+                                Тргни
+                              </button>
+                            )}
+                            {selectedMode === "pijara" && (
+                              <button
+                                className="ghost-button"
+                                type="button"
+                                onClick={() => {
+                                  setDraftItems((current) => current.filter((line) => line.itemName !== entry.itemName));
+                                }}
+                              >
+                                Тргни
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => {
-                      const fallbackItem = availableItems[0]?.nameMk ?? "";
-                      setDraftItems((current) => [
-                        ...current,
-                        {
-                          itemName: fallbackItem,
-                          quantity: 10,
-                          classB: selectedMode === "pijara",
-                          classBQuantity: selectedMode === "pijara" ? 10 : 0
-                        }
-                      ]);
-                      setItemSearch((current) => [...current, fallbackItem]);
-                    }}
-                  >
-                    Додади уште артикал
-                  </button>
+                    </div>
+                  )}
                 </article>
               )}
 
@@ -567,15 +556,8 @@ export function ProductionPage() {
                       createEntryMutation.mutate(nextEntry, {
                         onSuccess: () => {
                           setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                          setDraftItems([
-                            {
-                              itemName: availableItems[0]?.nameMk ?? "",
-                              quantity: 10,
-                              classB: selectedMode === "pijara",
-                              classBQuantity: selectedMode === "pijara" ? 10 : 0
-                            }
-                          ]);
-                          setItemSearch([availableItems[0]?.nameMk ?? ""]);
+                          setDraftItems([]);
+                          setItemSearch("");
                           triggerSuccessFeedback("Успешен внес");
                           setSaveConfirmation(
                             `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
@@ -588,15 +570,8 @@ export function ProductionPage() {
                               localId: createLocalId()
                             });
                             setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                            setDraftItems([
-                              {
-                                itemName: availableItems[0]?.nameMk ?? "",
-                                quantity: 10,
-                                classB: selectedMode === "pijara",
-                                classBQuantity: selectedMode === "pijara" ? 10 : 0
-                              }
-                            ]);
-                            setItemSearch([availableItems[0]?.nameMk ?? ""]);
+                            setDraftItems([]);
+                            setItemSearch("");
                             triggerSuccessFeedback("Снимено локално");
                             setSaveConfirmation("Нема интернет. Внесот е снимен локално и ќе се испрати автоматски.");
                             return;
@@ -721,34 +696,39 @@ export function ProductionPage() {
                     <div className="list-card">Нема активни артикли за избраниот дел.</div>
                   ) : (
                     <>
-                  <input
-                    className="search-input"
-                    value={wasteItemSearch}
-                    placeholder="Пребарај по име или шифра"
-                    onChange={(event) => setWasteItemSearch(event.target.value)}
-                  />
-                  <select
-                    value={wasteItemName}
-                    onChange={(event) => setWasteItemName(event.target.value)}
-                  >
-                    {availableItems
-                      .filter((item) => {
-                        const query = wasteItemSearch.trim().toLowerCase();
-                        if (!query) {
-                          return true;
-                        }
-
-                        return [item.nameMk, item.code].some((value) => value.toLowerCase().includes(query));
-                      })
-                      .map((item) => (
-                        <option key={item.itemId} value={item.nameMk}>
-                          {item.code} · {item.nameMk}
-                        </option>
-                      ))}
-                  </select>
-                  <span className="meta">
-                    Артикал шифра: {availableItems.find((item) => item.nameMk === wasteItemName)?.code ?? "-"}
-                  </span>
+                      <input
+                        className="search-input"
+                        value={wasteItemSearch}
+                        placeholder="Пребарај по име или шифра"
+                        onChange={(event) => setWasteItemSearch(event.target.value)}
+                      />
+                      {!wasteItemSearch.trim() ? (
+                        <div className="list-card">Внеси име или шифра за да ги видиш артиклите.</div>
+                      ) : (
+                        <div className="operator-lines-grid">
+                          {availableItems
+                            .filter((item) => [item.nameMk, item.code].some((value) => value.toLowerCase().includes(wasteItemSearch.trim().toLowerCase())))
+                            .slice(0, 24)
+                            .map((item) => (
+                              <label className="operator-line-row operator-line-row--checkbox operator-item-toggle" key={item.itemId}>
+                                <input
+                                  type="checkbox"
+                                  checked={wasteItemName === item.nameMk}
+                                  onChange={(event) => setWasteItemName(event.target.checked ? item.nameMk : "")}
+                                />
+                                <span>
+                                  <strong>{item.nameMk}</strong>
+                                  <small>Шифра: {item.code}</small>
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                      )}
+                      {wasteItemName && (
+                        <span className="meta">
+                          Артикал шифра: {availableItems.find((item) => item.nameMk === wasteItemName)?.code ?? "-"}
+                        </span>
+                      )}
                     </>
                   )}
                 </article>
@@ -823,7 +803,23 @@ export function ProductionPage() {
                           triggerSuccessFeedback("Успешна пријава на отпад");
                           setSaveConfirmation(`Отпад · ${request.locationName} · ${request.itemName}`);
                         },
-                        onError: () => {
+                        onError: (error) => {
+                          if (shouldQueueOffline(error)) {
+                            queuePendingWasteEntry({
+                              ...request,
+                              localId: createLocalId()
+                            });
+                            setDraft({ note: "", photoDataUrl: "", photoName: "" });
+                            setWasteSource(null);
+                            setWasteItemSearch("");
+                            setWasteItemName("");
+                            setWasteQuantity(1);
+                            setWasteReason("");
+                            triggerSuccessFeedback("Отпад снимен локално");
+                            setSaveConfirmation("Нема интернет. Отпадот е снимен локално и ќе се испрати автоматски.");
+                            return;
+                          }
+
                           setSaveError("Неуспешна пријава на отпад. Провери дали интернетот и серверот работат, па пробај повторно. Ако проблемот остане, контактирај администратор.");
                           triggerErrorFeedback("Неуспешна пријава на отпад");
                         }

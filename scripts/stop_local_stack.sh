@@ -15,4 +15,17 @@ for PID in $PIDS; do
   kill "$PID" || true
 done
 
+CLOUDFLARED_PIDS="$(
+  {
+    pgrep -f "cloudflared tunnel --protocol http2 --url http://127.0.0.1:8081" || true
+    pgrep -f "cloudflared tunnel run pecenje-app" || true
+    pgrep -f "cloudflared tunnel --protocol http2 run pecenje-app" || true
+  } | sort -u
+)"
+
+for PID in $CLOUDFLARED_PIDS; do
+  echo "Stopping Cloudflare tunnel PID $PID"
+  kill "$PID" || true
+done
+
 echo "Done."

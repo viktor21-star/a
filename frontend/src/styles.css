@@ -461,6 +461,41 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.report-preview-panel {
+  gap: 16px;
+}
+
+.report-preview-table {
+  display: grid;
+  gap: 10px;
+}
+
+.report-preview-head,
+.report-preview-body {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--surface-strong);
+}
+
+.report-preview-head {
+  border: 1px solid var(--line);
+}
+
+.report-preview-body {
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.report-preview-frame {
+  width: 100%;
+  min-height: 72vh;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+}
+
 .workflow-card p {
   color: var(--muted);
 }
@@ -843,6 +878,36 @@ button {
   grid-template-columns: minmax(180px, 1.2fr) minmax(220px, 1.8fr) minmax(120px, auto) minmax(120px, 0.8fr) auto;
   gap: 10px;
   align-items: center;
+}
+
+.operator-line-row--checkbox {
+  grid-template-columns: minmax(260px, 1.8fr) minmax(120px, 0.7fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr);
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.operator-item-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+}
+
+.operator-item-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.operator-item-toggle small {
+  color: var(--muted);
+}
+
+.operator-selected-items {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .operator-classb-toggle {
