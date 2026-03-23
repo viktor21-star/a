@@ -67,7 +67,8 @@ export function useDashboardOverview() {
 export function useVersionPolicy() {
   return useQuery({
     queryKey: ["version-policy"],
-    queryFn: () => api.getVersionPolicy<ApiEnvelope<AppVersionPolicy>>()
+    queryFn: createCachedQuery("version-policy", () => api.getVersionPolicy<ApiEnvelope<AppVersionPolicy>>()),
+    retry: 1
   });
 }
 

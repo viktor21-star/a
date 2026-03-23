@@ -1,4 +1,6 @@
 const API_BASE_STORAGE_KEY = "pecenje-api-base-url";
+const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
+
 
 function resolveDefaultApiBase() {
   if (typeof window !== "undefined") {
@@ -59,36 +61,76 @@ function authHeaders(): Record<string, string> {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: {
-      ...authHeaders()
-    }
-  });
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+function createTimeoutSignal(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    clear: () => window.clearTimeout(timeoutId)
+  };
+}
+
+function toNetworkError(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return new Error("Барањето истече. Провери ја API адресата и конекцијата.");
   }
 
-  return response.json() as Promise<T>;
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error("Неуспешна конекција со API.");
+}
+
+async function request<T>(path: string): Promise<T> {
+  const { signal, clear } = createTimeoutSignal();
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      headers: {
+        ...authHeaders()
+      },
+      signal
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return response.json() as Promise<T>;
+  } catch (error) {
+    throw toNetworkError(error);
+  } finally {
+    clear();
+  }
 }
 
 async function send<T>(path: string, method: "POST" | "PUT", body: unknown): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders()
-    },
-    body: JSON.stringify(body)
-  });
+  const { signal, clear } = createTimeoutSignal();
 
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    const message = payload?.errors?.[0]?.message ?? `API error: ${response.status}`;
-    throw new Error(message);
+  try {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders()
+      },
+      body: JSON.stringify(body),
+      signal
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.errors?.[0]?.message ?? `API error: ${response.status}`;
+      throw new Error(message);
+    }
+
+    return response.json() as Promise<T>;
+  } catch (error) {
+    throw toNetworkError(error);
+  } finally {
+    clear();
   }
-
-  return response.json() as Promise<T>;
 }
 
 export const api = {
