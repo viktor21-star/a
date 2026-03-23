@@ -36,7 +36,7 @@ jobs:
       - name: Build frontend and sync Android
         working-directory: frontend
         env:
-          VITE_API_BASE_URL: http://192.168.11.40:8081/api/v1
+          VITE_API_BASE_URL: https://app.superpetka.com/api/v1
         run: npm run mobile:sync
 
       - name: Remove local AAPT2 override
