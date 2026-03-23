@@ -11,12 +11,26 @@ export function VersionGate({ children }: PropsWithChildren) {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [startingUpdate, setStartingUpdate] = useState(false);
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const policy = versionQuery.data?.data ?? null;
   const needsForceUpdate = policy
     ? policy.forceUpdate ||
       compareVersions(APP_VERSION, policy.latestVersion) !== 0 ||
       String(APP_BUILD) !== String(policy.buildNumber)
     : false;
+
+  useEffect(() => {
+    if (!versionQuery.isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLoadingTimedOut(true);
+    }, 10000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [versionQuery.isLoading]);
 
   useEffect(() => {
     if (!policy || !needsForceUpdate || !isNativeAndroid()) {
@@ -42,17 +56,21 @@ export function VersionGate({ children }: PropsWithChildren) {
       });
   }, [needsForceUpdate, policy]);
 
-  if (versionQuery.isLoading) {
+  if (versionQuery.isLoading && !loadingTimedOut) {
     return <PageState message="Се проверува верзијата на апликацијата..." />;
   }
 
-  if (versionQuery.isError || !versionQuery.data) {
+  if (versionQuery.isError || !versionQuery.data || loadingTimedOut) {
     return (
       <section className="login-page">
         <article className="login-card update-card">
           <p className="topbar-eyebrow">Конекција</p>
           <h2>Не може да се провери верзијата на апликацијата</h2>
           <p>Провери ја API адресата. Ако backend-от е на друга IP, внеси ја точната адреса и пробај пак.</p>
+
+          {loadingTimedOut && (
+            <div className="form-error">Проверката трае предолго. Најчесто ова значи дека API адресата не одговара или телефонот нема пристап до backend-от.</div>
+          )}
 
           <div className="master-form">
             <input value={apiUrl} onChange={(event) => setApiUrl(event.target.value)} placeholder="https://app.superpetka.com/api/v1" />
