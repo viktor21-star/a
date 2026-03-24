@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { APP_BUILD, APP_VERSION } from "../lib/version";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export function LoginPage() {
         <img className="app-logo app-logo--login" src="/zito-logo.png" alt="Жито маркети" />
         <h2>Најава во системот</h2>
         <p>Внеси корисничко име и лозинка за да пристапиш во системот.</p>
+        <p className="meta">Верзија {APP_VERSION} · Build {APP_BUILD}</p>
 
         <div className="master-form">
           <input
