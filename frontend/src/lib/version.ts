@@ -1,6 +1,6 @@
-export const APP_VERSION = "1.0.2";
-export const APP_BUILD = "102";
-export const APP_BUILD_DATE = "2026-03-23 09:48";
+export const APP_VERSION = "1.0.3";
+export const APP_BUILD = "103";
+export const APP_BUILD_DATE = "2026-03-24 16:35";
 
 export function compareVersions(left: string, right: string) {
   const leftParts = left.split(".").map(Number);
