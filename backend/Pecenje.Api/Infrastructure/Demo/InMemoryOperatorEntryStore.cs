@@ -1,4 +1,5 @@
 using Pecenje.Api.Contracts.Production;
+using Pecenje.Api.Contracts.Common;
 using Pecenje.Api.Infrastructure.Sqlite;
 using Dapper;
 
@@ -13,7 +14,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
 
         var entries = connection.Query<OperatorEntryRow>(
             """
-            SELECT Id, Mode, LocationId, LocationName, Note, PhotoDataUrl, PhotoName, CreatedAt, UserId, OperatorName
+            SELECT Id, Mode, LocationId, LocationName, Note, PhotoName, CreatedAt, UserId, OperatorName
             FROM OperatorEntries
             ORDER BY datetime(CreatedAt) DESC, rowid DESC
             """).ToArray();
@@ -35,7 +36,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
                 .Select(item => new OperatorEntryLineDto(item.ItemName, item.Quantity, item.ClassB, item.ClassBQuantity))
                 .ToArray(),
             entry.Note,
-            entry.PhotoDataUrl,
+            string.Empty,
             entry.PhotoName,
             entry.CreatedAt,
             entry.UserId,
@@ -101,23 +102,48 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
         return entry;
     }
 
-    private sealed record OperatorEntryRow(
-        string Id,
-        string Mode,
-        int LocationId,
-        string LocationName,
-        string Note,
-        string PhotoDataUrl,
-        string PhotoName,
-        string CreatedAt,
-        long UserId,
-        string OperatorName);
+    public PhotoAssetDto? GetPhoto(string entryId)
+    {
+        using var connection = localAppDb.CreateConnection();
+        connection.Open();
 
-    private sealed record OperatorEntryItemRow(
-        string EntryId,
-        int ItemIndex,
-        string ItemName,
-        decimal Quantity,
-        bool ClassB,
-        decimal ClassBQuantity);
+        var row = connection.QuerySingleOrDefault<OperatorEntryPhotoRow>(
+            """
+            SELECT PhotoDataUrl, PhotoName
+            FROM OperatorEntries
+            WHERE Id = @EntryId
+            """,
+            new { EntryId = entryId });
+
+        return row is null ? null : new PhotoAssetDto(row.PhotoDataUrl, row.PhotoName);
+    }
+
+    private sealed class OperatorEntryRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string Mode { get; init; } = string.Empty;
+        public int LocationId { get; init; }
+        public string LocationName { get; init; } = string.Empty;
+        public string Note { get; init; } = string.Empty;
+        public string PhotoName { get; init; } = string.Empty;
+        public string CreatedAt { get; init; } = string.Empty;
+        public long UserId { get; init; }
+        public string OperatorName { get; init; } = string.Empty;
+    }
+
+    private sealed class OperatorEntryPhotoRow
+    {
+        public string PhotoDataUrl { get; init; } = string.Empty;
+        public string PhotoName { get; init; } = string.Empty;
+    }
+
+    private sealed class OperatorEntryItemRow
+    {
+        public string EntryId { get; init; } = string.Empty;
+        public int ItemIndex { get; init; }
+        public string ItemName { get; init; } = string.Empty;
+        public decimal Quantity { get; init; }
+        public bool ClassB { get; init; }
+        public decimal ClassBQuantity { get; init; }
+    }
 }

@@ -9,6 +9,7 @@ export function ItemsPage() {
   const { data, isLoading, isError } = useItems();
   const [nameSearch, setNameSearch] = useState("");
   const [codeSearch, setCodeSearch] = useState("");
+  const [modeFilter, setModeFilter] = useState<"all" | "pekara" | "pecenjara" | "pijara">("all");
 
   const filteredItems = useMemo(() => {
     const rows = data?.data ?? [];
@@ -18,9 +19,24 @@ export function ItemsPage() {
     return rows.filter((item) => {
       const matchesName = !nameQuery || [item.nameMk, item.groupName].some((value) => value.toLowerCase().includes(nameQuery));
       const matchesCode = !codeQuery || item.code.toLowerCase().includes(codeQuery);
-      return matchesName && matchesCode;
+      const matchesMode =
+        modeFilter === "all"
+          ? true
+          : modeFilter === "pekara"
+            ? itemMatchesMode(item, "pekara")
+            : modeFilter === "pecenjara"
+              ? itemMatchesMode(item, "pecenjara")
+              : item.groupCode?.trim() === "220" || item.groupCode?.trim() === "221";
+      return matchesName && matchesCode && matchesMode;
     });
-  }, [codeSearch, data, nameSearch]);
+  }, [codeSearch, data, modeFilter, nameSearch]);
+
+  const totals = useMemo(() => ({
+    total: filteredItems.length,
+    pekara: filteredItems.filter((item) => itemMatchesMode(item, "pekara")).length,
+    pecenjara: filteredItems.filter((item) => itemMatchesMode(item, "pecenjara")).length,
+    pijara: filteredItems.filter((item) => item.groupCode?.trim() === "220" || item.groupCode?.trim() === "221").length
+  }), [filteredItems]);
 
   if (!isAdministrator(user)) {
     return <PageState message="Артиклите ги одржува администратор." />;
@@ -38,7 +54,7 @@ export function ItemsPage() {
     <section className="page-grid">
       <header className="page-header">
         <div>
-          <p className="topbar-eyebrow">Шифарници</p>
+          <p className="topbar-eyebrow">Шифрарници</p>
           <h3>Артикли</h3>
           <p className="meta">Артиклите доаѓаат директно од API. Овде нема рачен внес, туку само преглед и пребарување.</p>
         </div>
@@ -61,7 +77,32 @@ export function ItemsPage() {
             placeholder="Пребарај по шифра"
             onChange={(event) => setCodeSearch(event.target.value)}
           />
+          <select value={modeFilter} onChange={(event) => setModeFilter(event.target.value as "all" | "pekara" | "pecenjara" | "pijara")}>
+            <option value="all">Сите оддели</option>
+            <option value="pekara">Пекара</option>
+            <option value="pecenjara">Печењара</option>
+            <option value="pijara">Пијара</option>
+          </select>
         </div>
+      </section>
+
+      <section className="admin-hero-grid">
+        <article className="admin-stat-tile">
+          <span>Прикажани артикли</span>
+          <strong>{totals.total}</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Пекара</span>
+          <strong>{totals.pekara}</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Печењара</span>
+          <strong>{totals.pecenjara}</strong>
+        </article>
+        <article className="admin-stat-tile">
+          <span>Пијара</span>
+          <strong>{totals.pijara}</strong>
+        </article>
       </section>
 
       <section className="panel">
@@ -69,23 +110,27 @@ export function ItemsPage() {
           <h3>Листа на артикли</h3>
           <span>{filteredItems.length} артикли</span>
         </div>
-        <div className="card-list admin-summary-grid">
-          {filteredItems.map((item) => (
-            <article className="workflow-card admin-tile-card" key={item.itemId}>
-              <div className="workflow-card__top">
-                <span className="pill">{item.code}</span>
-                <span className="status-chip">{item.isActive ? "Активен" : "Неактивен"}</span>
-              </div>
-              <h4>{item.nameMk}</h4>
-              <p>Шифра: {item.code}</p>
-              <p>Група код: {item.groupCode || "-"}</p>
-              <p>Група: {item.groupName}</p>
-              <p>Се користи во: {describeItemModes(item)}</p>
-              <p>Цена: {item.salesPrice}</p>
-              <p>Лимит отпад: {item.wasteLimitPct}%</p>
-            </article>
-          ))}
-        </div>
+        {filteredItems.length === 0 ? (
+          <div className="list-card">Нема артикли за избраниот филтер.</div>
+        ) : (
+          <div className="card-list admin-summary-grid">
+            {filteredItems.map((item) => (
+              <article className="workflow-card admin-tile-card" key={item.itemId}>
+                <div className="workflow-card__top">
+                  <span className="pill">{item.code}</span>
+                  <span className="status-chip">{item.isActive ? "Активен" : "Неактивен"}</span>
+                </div>
+                <h4>{item.nameMk}</h4>
+                <p>Шифра: {item.code}</p>
+                <p>Група код: {item.groupCode || "-"}</p>
+                <p>Група: {item.groupName}</p>
+                <p>Се користи во: {describeItemModes(item)}</p>
+                <p>Цена: {item.salesPrice}</p>
+                <p>Лимит отпад: {item.wasteLimitPct}%</p>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </section>
   );

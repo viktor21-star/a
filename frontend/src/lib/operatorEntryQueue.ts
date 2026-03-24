@@ -39,21 +39,23 @@ export function queuePendingWasteEntry(entry: PendingWasteEntry) {
 
 export async function syncPendingOperatorEntries() {
   if (pendingSyncInFlight || typeof window === "undefined" || !navigator.onLine) {
-    return;
+    return 0;
   }
 
   const queue = readPendingOperatorEntries();
   if (!queue.length) {
-    return;
+    return 0;
   }
 
   pendingSyncInFlight = true;
+  let syncedCount = 0;
   try {
     const remaining: PendingOperatorEntry[] = [];
     for (let index = 0; index < queue.length; index += 1) {
       const entry = queue[index];
       try {
         await api.createOperatorEntry(entry);
+        syncedCount += 1;
       } catch (error) {
         if (shouldQueueOffline(error)) {
           remaining.push(...queue.slice(index));
@@ -66,25 +68,29 @@ export async function syncPendingOperatorEntries() {
   } finally {
     pendingSyncInFlight = false;
   }
+
+  return syncedCount;
 }
 
 export async function syncPendingWasteEntries() {
   if (pendingSyncInFlight || typeof window === "undefined" || !navigator.onLine) {
-    return;
+    return 0;
   }
 
   const queue = readPendingWasteEntries();
   if (!queue.length) {
-    return;
+    return 0;
   }
 
   pendingSyncInFlight = true;
+  let syncedCount = 0;
   try {
     const remaining: PendingWasteEntry[] = [];
     for (let index = 0; index < queue.length; index += 1) {
       const entry = queue[index];
       try {
         await api.createWaste(entry);
+        syncedCount += 1;
       } catch (error) {
         if (shouldQueueOffline(error)) {
           remaining.push(...queue.slice(index));
@@ -97,6 +103,8 @@ export async function syncPendingWasteEntries() {
   } finally {
     pendingSyncInFlight = false;
   }
+
+  return syncedCount;
 }
 
 function readPendingOperatorEntries(): PendingOperatorEntry[] {

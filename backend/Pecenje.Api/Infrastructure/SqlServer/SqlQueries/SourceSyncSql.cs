@@ -53,6 +53,7 @@ public static class SourceSyncSql
 
         DECLARE @optItemColumn nvarchar(128) = NULL;
         DECLARE @optLocationColumn nvarchar(128) = NULL;
+        DECLARE @optAllowedColumn nvarchar(128) = NULL;
 
         IF OBJECT_ID('dbo.optzalpooe') IS NOT NULL
         BEGIN
@@ -64,6 +65,10 @@ public static class SourceSyncSql
             ELSE IF COL_LENGTH('dbo.optzalpooe', 'SifOe') IS NOT NULL SET @optLocationColumn = 'SifOe';
             ELSE IF COL_LENGTH('dbo.optzalpooe', 'OrgEd') IS NOT NULL SET @optLocationColumn = 'OrgEd';
             ELSE IF COL_LENGTH('dbo.optzalpooe', 'Sifra_Org') IS NOT NULL SET @optLocationColumn = 'Sifra_Org';
+
+            IF COL_LENGTH('dbo.optzalpooe', 'Dozvoleno') IS NOT NULL SET @optAllowedColumn = 'Dozvoleno';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'Dozvolen') IS NOT NULL SET @optAllowedColumn = 'Dozvolen';
+            ELSE IF COL_LENGTH('dbo.optzalpooe', 'Allowed') IS NOT NULL SET @optAllowedColumn = 'Allowed';
         END
 
         DECLARE @sql nvarchar(max) = N'
@@ -91,7 +96,12 @@ public static class SourceSyncSql
                     WHEN @optItemColumn IS NOT NULL AND @optLocationColumn IS NOT NULL
                       THEN N'CAST(o.' + QUOTENAME(@optLocationColumn) + N' AS nvarchar(50))'
                     ELSE N'CAST(NULL AS nvarchar(50))'
-                  END + N' AS AllowedLocationCode
+                  END + N' AS AllowedLocationCode,
+                ' + CASE
+                    WHEN @optItemColumn IS NOT NULL AND @optAllowedColumn IS NOT NULL
+                      THEN N'CAST(o.' + QUOTENAME(@optAllowedColumn) + N' AS nvarchar(10))'
+                    ELSE N'CAST(NULL AS nvarchar(10))'
+                  END + N' AS AllowedFlag
             FROM dbo.katart k ' +
             CASE
               WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL
@@ -103,6 +113,13 @@ public static class SourceSyncSql
                 THEN N'LEFT JOIN dbo.optzalpooe o ON CAST(k.Sifra_Art AS nvarchar(50)) = CAST(o.' + QUOTENAME(@optItemColumn) + N' AS nvarchar(50)) '
               ELSE N''
             END +
+            N'WHERE ' + CASE
+              WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL AND @podgrupiGroupColumn IS NOT NULL
+                THEN N'CAST(p.' + QUOTENAME(@podgrupiGroupColumn) + N' AS nvarchar(50))'
+              WHEN @fallbackGroupColumn IS NOT NULL
+                THEN N'CAST(k.' + QUOTENAME(@fallbackGroupColumn) + N' AS nvarchar(50))'
+              ELSE N'CAST('''' AS nvarchar(50))'
+            END + N' IN (''260'', ''251'', ''220'', ''221'') ' +
             N'ORDER BY k.ImeArt;';
 
         EXEC sp_executesql @sql;

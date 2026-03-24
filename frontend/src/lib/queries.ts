@@ -101,6 +101,51 @@ export function useCreatePlan() {
   });
 }
 
+export function useUpdatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ planHeaderId, payload }: { planHeaderId: number; payload: CreateManualPlanRequest }) =>
+      api.updatePlan<ApiEnvelope<PlanCard>>(planHeaderId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+    }
+  });
+}
+
+export function useDeletePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (planHeaderId: number) => api.deletePlan<ApiEnvelope<null>>(planHeaderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+    }
+  });
+}
+
+export function useDeactivatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (planHeaderId: number) => api.deactivatePlan<ApiEnvelope<PlanCard>>(planHeaderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+    }
+  });
+}
+
+export function useActivatePlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (planHeaderId: number) => api.activatePlan<ApiEnvelope<PlanCard>>(planHeaderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plans"] });
+    }
+  });
+}
+
 export function useBatches() {
   return useQuery({
     queryKey: ["batches"],
@@ -121,6 +166,7 @@ export function useCreateOperatorEntry() {
   return useMutation({
     mutationFn: (payload: CreateOperatorEntryRequest) => api.createOperatorEntry<ApiEnvelope<OperatorEntry>>(payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["operator-entries"] });
       queryClient.invalidateQueries({ queryKey: ["report-plan-vs-actual"] });
     }
@@ -141,6 +187,8 @@ export function useCreateWasteEntry() {
     mutationFn: (payload: CreateWasteEntryRequest) => api.createWaste<ApiEnvelope<WasteEntry>>(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["waste"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["report-plan-vs-actual"] });
     }
   });
 }
@@ -171,10 +219,21 @@ export function useExportPlanVsActualPdf() {
   });
 }
 
-export function useLocations() {
+export function useLocations(includeInactive = false) {
   return useQuery({
-    queryKey: ["locations"],
-    queryFn: createCachedQuery("locations", () => api.getLocations<ApiEnvelope<Location[]>>())
+    queryKey: ["locations", includeInactive ? "all" : "active"],
+    queryFn: async () => {
+      const response = await api.getLocations<ApiEnvelope<Location[]>>();
+      if (includeInactive) {
+        return response;
+      }
+
+      return {
+        ...response,
+        data: response.data.filter((location) => location.isActive)
+      };
+    },
+    staleTime: 0
   });
 }
 
@@ -259,7 +318,22 @@ export function useCreateUser() {
 
   return useMutation({
     mutationFn: (payload: CreateUserRequest) => api.createUser<ApiEnvelope<UserSummary>>(payload),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      queryClient.setQueryData<ApiEnvelope<UserSummary[]> | undefined>(["users"], (current) => {
+        if (!current) {
+          return {
+            data: [response.data],
+            meta: null,
+            errors: null
+          };
+        }
+
+        const existing = current.data.filter((entry) => entry.userId !== response.data.userId);
+        return {
+          ...current,
+          data: [response.data, ...existing]
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ["users"] });
     }
   });
@@ -297,6 +371,8 @@ export function useUpdateLocation() {
       api.updateLocation<ApiEnvelope<Location>>(locationId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["locations"] });
+      queryClient.invalidateQueries({ queryKey: ["locations", "all"] });
+      queryClient.invalidateQueries({ queryKey: ["locations", "active"] });
     }
   });
 }

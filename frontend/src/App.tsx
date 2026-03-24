@@ -17,6 +17,7 @@ import { VersionPolicyPage } from "./pages/VersionPolicyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { ReasonsPage } from "./pages/ReasonsPage";
 import { WastePage } from "./pages/WastePage";
+import { OvenTypesPage } from "./pages/OvenTypesPage";
 
 export function App() {
   return (
@@ -40,6 +41,7 @@ export function App() {
         <Route path="master-data/locations" element={<LocationsPage />} />
         <Route path="master-data/items" element={<ItemsPage />} />
         <Route path="master-data/ovens" element={<OvensPage />} />
+        <Route path="master-data/oven-types" element={<OvenTypesPage />} />
         <Route path="master-data/terms" element={<TermsPage />} />
         <Route path="master-data/reasons" element={<ReasonsPage />} />
         <Route path="user-access" element={<UserAccessPage />} />

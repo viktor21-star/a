@@ -40,10 +40,10 @@ app-debug.apk
 
 ## Production напомена
 
-Во workflow моментално е поставено:
+Во workflow сега е поставено:
 
 ```text
-VITE_API_BASE_URL=http://192.168.11.40:8081/api/v1
+VITE_API_BASE_URL=https://app.superpetka.com/api/v1
 ```
 
-Пред production release ова треба да се смени на реална production API адреса, по можност `HTTPS`.
+Значи GitHub Actions APK build-от е усогласен со тековната production адреса.

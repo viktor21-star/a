@@ -24,6 +24,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<InMemoryReasonStore>();
         services.AddScoped<DemoUserAccessRepository>();
         services.AddScoped<SqliteUserAccessRepository>();
+        services.AddScoped<SqliteLocationRepository>();
+        services.AddScoped<DemoMasterDataRepository>();
+        services.AddScoped<SqlServerMasterDataRepository>();
         services.AddScoped<IAuthService, DemoAuthService>();
         services.AddScoped<IAuditService, DemoAuditService>();
         services.AddScoped<ICurrentUserProvider, HttpCurrentUserProvider>();
@@ -34,7 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlanningRepository, DemoPlanningRepository>();
         services.AddScoped<IProductionRepository, DemoProductionRepository>();
         services.AddScoped<IAnalyticsRepository, DemoAnalyticsRepository>();
-        services.AddScoped<IMasterDataRepository, SqlServerMasterDataRepository>();
+        services.AddScoped<IMasterDataRepository, HybridMasterDataRepository>();
         services.AddScoped<ISourceMasterDataReader, SqlServerSourceMasterDataReader>();
         services.AddScoped<IUserAccessRepository, HybridUserAccessRepository>();
         services.AddScoped<DashboardAppService>();

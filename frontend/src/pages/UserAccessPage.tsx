@@ -5,16 +5,9 @@ import { useCreateUser, useLocations, useUpdateUserAccount, useUpdateUserLocatio
 import type { CreateUserRequest, UpdateUserAccountRequest, UserLocationPermission } from "../lib/types";
 
 type PermissionField =
-  | "canPlan"
-  | "canBake"
-  | "canRecordWaste"
-  | "canViewReports"
-  | "canApprovePlan"
   | "canUsePekara"
   | "canUsePecenjara"
   | "canUsePijara";
-
-const ovenTypes = ["Нема", "Ротациона", "Камена", "Комбинирана", "Конвекциска"];
 
 const emptyUser: CreateUserRequest = {
   defaultLocationId: 0,
@@ -38,7 +31,7 @@ const emptyAccountDraft: UpdateUserAccountRequest = {
 export function UserAccessPage() {
   const { user } = useAuth();
   const usersQuery = useUsers();
-  const locationsListQuery = useLocations();
+  const locationsListQuery = useLocations(true);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const locationsQuery = useUserLocations(selectedUserId);
   const updateLocationsMutation = useUpdateUserLocations();
@@ -46,10 +39,23 @@ export function UserAccessPage() {
   const createUserMutation = useCreateUser();
   const [draft, setDraft] = useState<UserLocationPermission[]>([]);
   const [newUser, setNewUser] = useState<CreateUserRequest>(emptyUser);
+  const [createUserMessage, setCreateUserMessage] = useState<string | null>(null);
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [accountMessage, setAccountMessage] = useState<string | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [permissionsMessage, setPermissionsMessage] = useState<string | null>(null);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState<UpdateUserAccountRequest>(emptyAccountDraft);
   const [userSearch, setUserSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "administrator" | "operator">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [locationFilter, setLocationFilter] = useState<"all" | string>("all");
   const selectedUser = usersQuery.data?.data.find((entry) => entry.userId === selectedUserId) ?? null;
   const operatorUserSelected = selectedUser?.roleCode === "operator";
+  const activeLocations = useMemo(
+    () => (locationsListQuery.data?.data ?? []).filter((location) => location.isActive),
+    [locationsListQuery.data]
+  );
 
   useEffect(() => {
     if (!selectedUserId && usersQuery.data?.data.length) {
@@ -58,13 +64,13 @@ export function UserAccessPage() {
   }, [selectedUserId, usersQuery.data]);
 
   useEffect(() => {
-    if (locationsListQuery.data?.data.length && !newUser.defaultLocationId) {
+    if (activeLocations.length && !newUser.defaultLocationId) {
       setNewUser((current) => ({
         ...current,
-        defaultLocationId: locationsListQuery.data?.data[0]?.locationId ?? 0
+        defaultLocationId: activeLocations[0]?.locationId ?? 0
       }));
     }
-  }, [locationsListQuery.data, newUser.defaultLocationId]);
+  }, [activeLocations, newUser.defaultLocationId]);
 
   useEffect(() => {
     if (locationsQuery.data?.data) {
@@ -88,17 +94,42 @@ export function UserAccessPage() {
     [locationsListQuery.data, newUser.defaultLocationId]
   );
 
+  const locationsById = useMemo(
+    () => new Map((locationsListQuery.data?.data ?? []).map((entry) => [entry.locationId, entry])),
+    [locationsListQuery.data]
+  );
+
   const filteredUsers = useMemo(() => {
     const rows = usersQuery.data?.data ?? [];
     const query = userSearch.trim().toLowerCase();
-    if (!query) {
-      return rows;
-    }
+    return rows
+      .filter((entry) => roleFilter === "all" || entry.roleCode === roleFilter)
+      .filter((entry) => locationFilter === "all" || String(entry.defaultLocationId ?? "") === locationFilter)
+      .filter((entry) => {
+        if (statusFilter === "all") {
+          return true;
+        }
 
-    return rows.filter((entry) =>
-      [entry.fullName, entry.username, entry.roleCode].some((value) => value.toLowerCase().includes(query))
-    );
-  }, [userSearch, usersQuery.data]);
+        return statusFilter === "active" ? entry.isActive : !entry.isActive;
+      })
+      .filter((entry) => !query || [entry.username, entry.roleCode].some((value) => value.toLowerCase().includes(query)));
+  }, [locationFilter, roleFilter, statusFilter, userSearch, usersQuery.data]);
+
+  const userCounts = useMemo(() => {
+    const rows = usersQuery.data?.data ?? [];
+    return {
+      total: rows.length,
+      active: rows.filter((entry) => entry.isActive).length,
+      operators: rows.filter((entry) => entry.roleCode === "operator").length
+    };
+  }, [usersQuery.data]);
+
+  const selectedUserLocationLabel = selectedUser
+    ? formatLocationLabel(
+        locationsById.get(selectedUser.defaultLocationId ?? -1)?.code,
+        locationsById.get(selectedUser.defaultLocationId ?? -1)?.nameMk
+      )
+    : "Нема";
 
   if (!isAdministrator(user)) {
     return <PageState message="Само администратор може да креира корисници и да менува привилегии." />;
@@ -112,13 +143,17 @@ export function UserAccessPage() {
     return <PageState message="Не може да се вчитаат корисниците или локациите." />;
   }
 
+  if (!activeLocations.length) {
+    return <PageState message="Нема активни локации. Прво активирај локација во Шифрарници > Локации." />;
+  }
+
   return (
     <section className="page-grid">
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Администрација</p>
           <h3>Корисници</h3>
-          <p className="meta">Новите корисници се отвораат одделно, а постоечките се пребаруваат и им се менуваат привилегии, статус и лозинка.</p>
+          <p className="meta">Нов корисник се отвора со локација, корисничко име, лозинка и улога. Модулите стојат како работна позиција.</p>
         </div>
       </header>
 
@@ -126,6 +161,10 @@ export function UserAccessPage() {
         <div className="panel-header">
           <h3>Нов корисник</h3>
         </div>
+
+        {createUserError && <div className="form-error">{createUserError}</div>}
+        {createUserMessage && <div className="sync-result">{createUserMessage}</div>}
+
         <div className="admin-form-grid">
           <article className="admin-input-tile">
             <span>Работна локација</span>
@@ -133,22 +172,13 @@ export function UserAccessPage() {
               value={newUser.defaultLocationId}
               onChange={(event) => setNewUser((current) => ({ ...current, defaultLocationId: Number(event.target.value) }))}
             >
-              {locationsListQuery.data.data.map((location) => (
+              {activeLocations.map((location) => (
                 <option key={location.locationId} value={location.locationId}>
                   {location.code} · {location.nameMk}
                 </option>
               ))}
             </select>
             <small>{selectedLocationName}</small>
-          </article>
-
-          <article className="admin-input-tile">
-            <span>Име и презиме</span>
-            <input
-              value={newUser.fullName}
-              placeholder="Име и презиме"
-              onChange={(event) => setNewUser((current) => ({ ...current, fullName: event.target.value }))}
-            />
           </article>
 
           <article className="admin-input-tile">
@@ -178,41 +208,13 @@ export function UserAccessPage() {
             >
               <option value="operator">Оператор</option>
               <option value="administrator">Администратор</option>
-              <option value="market_manager">Менаџер</option>
             </select>
           </article>
 
-          <article className="admin-input-tile">
-            <span>Печка за Пекара</span>
-            <select
-              value={newUser.pekaraOvenType}
-              onChange={(event) => setNewUser((current) => ({ ...current, pekaraOvenType: event.target.value }))}
-            >
-              {ovenTypes.map((ovenType) => (
-                <option key={ovenType} value={ovenType}>
-                  {ovenType}
-                </option>
-              ))}
-            </select>
-          </article>
-
-          <article className="admin-input-tile">
-            <span>Печка за Печењара</span>
-            <select
-              value={newUser.pecenjaraOvenType}
-              onChange={(event) => setNewUser((current) => ({ ...current, pecenjaraOvenType: event.target.value }))}
-            >
-              {ovenTypes.map((ovenType) => (
-                <option key={ovenType} value={ovenType}>
-                  {ovenType}
-                </option>
-              ))}
-            </select>
-          </article>
         </div>
 
         <div className="operator-explainer">
-          <strong>Модули на работната локација</strong>
+          <strong>Модули на работна позиција</strong>
           <span>Нов корисник ќе ги гледа само штиклираните операторски модули. Отпад се додава автоматски според избраните модули.</span>
         </div>
 
@@ -233,28 +235,40 @@ export function UserAccessPage() {
             className="action-button"
             type="button"
             onClick={() => {
+              setCreateUserError(null);
+              setCreateUserMessage(null);
+
               if (
                 !newUser.defaultLocationId ||
-                !newUser.username ||
-                !newUser.fullName ||
-                !newUser.password ||
+                !newUser.username.trim() ||
+                !newUser.password.trim() ||
                 (!newUser.canUsePekara && !newUser.canUsePecenjara && !newUser.canUsePijara)
               ) {
+                setCreateUserError("Пополнете локација, корисничко име, лозинка и барем една работна позиција.");
                 return;
               }
 
-              createUserMutation.mutate(newUser, {
-                onSuccess: (response) => {
-                  setSelectedUserId(response.data.userId);
-                  setNewUser({
-                    ...emptyUser,
-                    defaultLocationId: locationsListQuery.data.data[0]?.locationId ?? 0
-                  });
+              createUserMutation.mutate({
+                ...newUser,
+                fullName: newUser.username.trim(),
+                pekaraOvenType: "Нема",
+                pecenjaraOvenType: "Нема"
+              }, {
+                    onSuccess: (response) => {
+                      setSelectedUserId(response.data.userId);
+                      setNewUser({
+                        ...emptyUser,
+                        defaultLocationId: activeLocations[0]?.locationId ?? 0
+                      });
+                      setCreateUserMessage(`Успешно е креиран корисник: ${response.data.username}`);
+                    },
+                onError: (error) => {
+                  setCreateUserError(error instanceof Error ? error.message : "Корисникот не може да се креира.");
                 }
               });
             }}
           >
-            Креирај корисник
+            {createUserMutation.isPending ? "Се креира..." : "Креирај корисник"}
           </button>
         </div>
       </section>
@@ -263,13 +277,45 @@ export function UserAccessPage() {
         <div className="panel-header">
           <h3>Постоечки корисници</h3>
         </div>
+        <div className="admin-hero-grid">
+          <article className="admin-stat-tile">
+            <span>Вкупно корисници</span>
+            <strong>{userCounts.total}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Активни</span>
+            <strong>{userCounts.active}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Оператори</span>
+            <strong>{userCounts.operators}</strong>
+          </article>
+        </div>
         <div className="master-form master-form--inline">
           <input
             className="search-input"
             value={userSearch}
-            placeholder="Пребарај по име, корисничко име или улога"
+            placeholder="Пребарај по корисничко име или улога"
             onChange={(event) => setUserSearch(event.target.value)}
           />
+          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as "all" | "administrator" | "operator")}>
+            <option value="all">Сите улоги</option>
+            <option value="administrator">Администратор</option>
+            <option value="operator">Оператор</option>
+          </select>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "active" | "inactive")}>
+            <option value="all">Сите статуси</option>
+            <option value="active">Само активни</option>
+            <option value="inactive">Само неактивни</option>
+          </select>
+          <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+            <option value="all">Сите локации</option>
+            {activeLocations.map((location) => (
+              <option key={location.locationId} value={String(location.locationId)}>
+                {location.code} · {location.nameMk}
+              </option>
+            ))}
+          </select>
         </div>
       </section>
 
@@ -278,6 +324,7 @@ export function UserAccessPage() {
           <div className="panel-header">
             <h3>Листа на корисници</h3>
           </div>
+          {!filteredUsers.length && <div className="empty-state">Нема корисници за избраниот филтер.</div>}
           <div className="card-list admin-summary-grid">
             {filteredUsers.map((entry) => (
               <button
@@ -286,10 +333,12 @@ export function UserAccessPage() {
                 type="button"
                 onClick={() => setSelectedUserId(entry.userId)}
               >
-                <strong>{entry.fullName}</strong>
-                <span>{entry.username}</span>
-                <span>{entry.roleCode}</span>
-                <span>{entry.isActive ? "Активен" : "Деактивиран"}</span>
+                <strong>{entry.username}</strong>
+                <span>{entry.roleCode === "administrator" ? "Администратор" : "Оператор"}</span>
+                <small>{formatLocationLabel(locationsById.get(entry.defaultLocationId ?? -1)?.code, locationsById.get(entry.defaultLocationId ?? -1)?.nameMk)}</small>
+                <span className={`status-chip ${entry.isActive ? "status-chip--active" : "status-chip--inactive"}`}>
+                  {entry.isActive ? "Активен" : "Неактивен"}
+                </span>
               </button>
             ))}
           </div>
@@ -307,14 +356,20 @@ export function UserAccessPage() {
               <div className="admin-form-grid">
                 <article className="admin-input-tile">
                   <span>Корисник</span>
-                  <strong>{selectedUser.fullName}</strong>
-                  <small>{selectedUser.username}</small>
+                  <strong>{selectedUser.username}</strong>
+                  <small>ID: {selectedUser.userId}</small>
+                </article>
+
+                <article className="admin-input-tile">
+                  <span>Работна локација</span>
+                  <strong>{selectedUserLocationLabel}</strong>
+                  <small>Основна локација за најавување</small>
                 </article>
 
                 <article className="admin-input-tile">
                   <span>Улога</span>
-                  <strong>{selectedUser.roleCode}</strong>
-                  <small>{accountDraft.isActive ? "Активен" : "Деактивиран"}</small>
+                  <strong>{selectedUser.roleCode === "administrator" ? "Администратор" : "Оператор"}</strong>
+                  <small>{accountDraft.isActive ? "Активен корисник" : "Неактивен корисник"}</small>
                 </article>
 
                 <article className="admin-input-tile">
@@ -339,6 +394,9 @@ export function UserAccessPage() {
                 </article>
               </div>
 
+              {accountMessage && <div className="sync-result">{accountMessage}</div>}
+              {accountError && <div className="form-error">{accountError}</div>}
+
               <div className="login-actions">
                 <button
                   className="action-button"
@@ -348,12 +406,20 @@ export function UserAccessPage() {
                       return;
                     }
 
+                    setAccountMessage(null);
+                    setAccountError(null);
+
                     updateAccountMutation.mutate({
                       userId: selectedUserId,
                       payload: accountDraft
                     }, {
                       onSuccess: () => {
                         setAccountDraft((current) => ({ ...current, newPassword: "" }));
+                        setAccountMessage(`Успешно е снимен профилот за ${selectedUser.username}.`);
+                      }
+                      ,
+                      onError: (error) => {
+                        setAccountError(error instanceof Error ? error.message : "Профилот не може да се сними.");
                       }
                     });
                   }}
@@ -372,13 +438,29 @@ export function UserAccessPage() {
                       return;
                     }
 
+                    setPermissionsMessage(null);
+                    setPermissionsError(null);
+
                     updateLocationsMutation.mutate({
                       userId: selectedUserId,
                       payload: {
                         locations: draft.map((entry) => ({
                           ...entry,
-                          canRecordWaste: entry.canRecordWaste || entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara
+                          canPlan: false,
+                          canBake: entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara,
+                          canRecordWaste: entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara,
+                          canViewReports: false,
+                          canApprovePlan: false,
+                          pekaraOvenType: "Нема",
+                          pecenjaraOvenType: "Нема"
                         }))
+                      }
+                    }, {
+                      onSuccess: () => {
+                        setPermissionsMessage(`Успешно се снимени привилегиите за ${selectedUser.username}.`);
+                      },
+                      onError: (error) => {
+                        setPermissionsError(error instanceof Error ? error.message : "Привилегиите не може да се снимат.");
                       }
                     });
                   }}
@@ -387,12 +469,34 @@ export function UserAccessPage() {
                 </button>
               </div>
 
+              {permissionsMessage && <div className="sync-result">{permissionsMessage}</div>}
+              {permissionsError && <div className="form-error">{permissionsError}</div>}
+
               {locationsQuery.isLoading && <div className="list-card">Се вчитуваат привилегии...</div>}
 
               {operatorUserSelected && (
                 <div className="operator-explainer">
                   <strong>Оператор</strong>
-                  <span>Операторот треба да работи на една локација и таму да ги има само дозволените модули.</span>
+                  <span>Избери ги само модулите што треба да ги гледа на работната локација.</span>
+                </div>
+              )}
+
+              {!!draft.length && (
+                <div className="admin-hero-grid">
+                  <article className="admin-stat-tile">
+                    <span>Работна локација</span>
+                    <strong>{draft.find((entry) => entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara)?.locationName ?? "Нема"}</strong>
+                  </article>
+                  <article className="admin-stat-tile">
+                    <span>Доделени модули</span>
+                    <strong>
+                      {[
+                        draft.some((entry) => entry.canUsePekara) ? "Пекара" : null,
+                        draft.some((entry) => entry.canUsePecenjara) ? "Печењара" : null,
+                        draft.some((entry) => entry.canUsePijara) ? "Пијара" : null
+                      ].filter(Boolean).join(", ") || "Нема"}
+                    </strong>
+                  </article>
                 </div>
               )}
 
@@ -400,44 +504,6 @@ export function UserAccessPage() {
                 {draft.map((entry, index) => (
                   <article className="permission-card permission-card--large" key={`${entry.locationId}-${entry.locationName}`}>
                     <strong>{entry.locationName}</strong>
-
-                    <div className="admin-form-grid">
-                      <article className="admin-input-tile">
-                        <span>Печка за Пекара</span>
-                        <select
-                          value={entry.pekaraOvenType ?? "Нема"}
-                          onChange={(event) => updateOvenType(index, "pekaraOvenType", event.target.value)}
-                        >
-                          {ovenTypes.map((ovenType) => (
-                            <option key={ovenType} value={ovenType}>
-                              {ovenType}
-                            </option>
-                          ))}
-                        </select>
-                      </article>
-
-                      <article className="admin-input-tile">
-                        <span>Печка за Печењара</span>
-                        <select
-                          value={entry.pecenjaraOvenType ?? "Нема"}
-                          onChange={(event) => updateOvenType(index, "pecenjaraOvenType", event.target.value)}
-                        >
-                          {ovenTypes.map((ovenType) => (
-                            <option key={ovenType} value={ovenType}>
-                              {ovenType}
-                            </option>
-                          ))}
-                        </select>
-                      </article>
-                    </div>
-
-                    <div className="permission-check-grid">
-                      <label><input type="checkbox" checked={entry.canPlan} onChange={() => toggle(index, "canPlan")} /> Планирање</label>
-                      <label><input type="checkbox" checked={entry.canBake} onChange={() => toggle(index, "canBake")} /> Печење</label>
-                      <label><input type="checkbox" checked={entry.canRecordWaste || entry.canUsePekara || entry.canUsePecenjara || entry.canUsePijara} readOnly /> Отпад (автоматски)</label>
-                      <label><input type="checkbox" checked={entry.canViewReports} onChange={() => toggle(index, "canViewReports")} /> Извештаи</label>
-                      <label><input type="checkbox" checked={entry.canApprovePlan} onChange={() => toggle(index, "canApprovePlan")} /> Одобрување</label>
-                    </div>
 
                     <div className="mode-grid">
                       <button className={`mode-tile${entry.canUsePekara ? " mode-tile--active" : ""}`} type="button" onClick={() => toggle(index, "canUsePekara")}>
@@ -469,7 +535,7 @@ export function UserAccessPage() {
 
       const nextValue = !target[field];
 
-      if (operatorUserSelected && (field === "canBake" || field === "canUsePekara" || field === "canUsePecenjara" || field === "canUsePijara") && nextValue) {
+      if (operatorUserSelected && (field === "canUsePekara" || field === "canUsePecenjara" || field === "canUsePijara") && nextValue) {
         return current.map((entry, currentIndex) => {
           if (currentIndex === index) {
             return { ...entry, [field]: nextValue };
@@ -480,22 +546,49 @@ export function UserAccessPage() {
             canBake: false,
             canUsePekara: false,
             canUsePecenjara: false,
-            canUsePijara: false
+            canUsePijara: false,
+            canPlan: false,
+            canViewReports: false,
+            canApprovePlan: false
           };
         });
       }
 
       return current.map((entry, currentIndex) =>
-        currentIndex === index ? { ...entry, [field]: nextValue } : entry
+        currentIndex === index
+          ? {
+              ...entry,
+              [field]: nextValue,
+              canBake:
+                field === "canUsePekara" || field === "canUsePecenjara" || field === "canUsePijara"
+                  ? field === "canUsePekara"
+                    ? nextValue || entry.canUsePecenjara || entry.canUsePijara
+                    : field === "canUsePecenjara"
+                      ? entry.canUsePekara || nextValue || entry.canUsePijara
+                      : entry.canUsePekara || entry.canUsePecenjara || nextValue
+                  : entry.canBake,
+              canRecordWaste:
+                field === "canUsePekara" || field === "canUsePecenjara" || field === "canUsePijara"
+                  ? field === "canUsePekara"
+                    ? nextValue || entry.canUsePecenjara || entry.canUsePijara
+                    : field === "canUsePecenjara"
+                      ? entry.canUsePekara || nextValue || entry.canUsePijara
+                      : entry.canUsePekara || entry.canUsePecenjara || nextValue
+                  : entry.canRecordWaste,
+              canPlan: false,
+              canViewReports: false,
+              canApprovePlan: false
+            }
+          : entry
       );
     });
   }
+}
 
-  function updateOvenType(index: number, field: "pekaraOvenType" | "pecenjaraOvenType", ovenType: string) {
-    setDraft((current) =>
-      current.map((entry, currentIndex) =>
-        currentIndex === index ? { ...entry, [field]: ovenType } : entry
-      )
-    );
+function formatLocationLabel(code?: string, name?: string) {
+  if (code && name) {
+    return `${code} · ${name}`;
   }
+
+  return code || name || "Нема";
 }

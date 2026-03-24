@@ -16,6 +16,14 @@ public static class BatchEndpoints
         group.MapGet("/entries", async (ProductionAppService appService, CancellationToken cancellationToken) => Results.Ok(
             new ApiEnvelope<IReadOnlyList<OperatorEntryDto>>(await appService.GetOperatorEntriesAsync(cancellationToken))));
 
+        group.MapGet("/entries/{entryId}/photo", async (string entryId, ProductionAppService appService, CancellationToken cancellationToken) =>
+        {
+            var photo = await appService.GetOperatorEntryPhotoAsync(entryId, cancellationToken);
+            return photo is null
+                ? Results.NotFound()
+                : Results.Ok(new ApiEnvelope<Pecenje.Api.Contracts.Common.PhotoAssetDto>(photo));
+        });
+
         group.MapPost("/entries", async (CreateOperatorEntryRequest request, ProductionAppService appService, CancellationToken cancellationToken) => Results.Ok(
             new ApiEnvelope<OperatorEntryDto>(await appService.CreateOperatorEntryAsync(request, cancellationToken))));
 

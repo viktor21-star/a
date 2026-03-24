@@ -1,5 +1,5 @@
 const API_BASE_STORAGE_KEY = "pecenje-api-base-url";
-const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 20000;
 
 
 function resolveDefaultApiBase() {
@@ -133,6 +133,32 @@ async function send<T>(path: string, method: "POST" | "PUT", body: unknown): Pro
   }
 }
 
+async function remove<T>(path: string): Promise<T> {
+  const { signal, clear } = createTimeoutSignal();
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      method: "DELETE",
+      headers: {
+        ...authHeaders()
+      },
+      signal
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const message = payload?.errors?.[0]?.message ?? `API error: ${response.status}`;
+      throw new Error(message);
+    }
+
+    return response.json() as Promise<T>;
+  } catch (error) {
+    throw toNetworkError(error);
+  } finally {
+    clear();
+  }
+}
+
 export const api = {
   login: <T>(body: unknown) => send<T>("/auth/login", "POST", body),
   getDashboardOverview: <T>() => request<T>("/dashboard/overview"),
@@ -140,10 +166,16 @@ export const api = {
   updateVersionPolicy: <T>(body: unknown) => send<T>("/version-policy", "PUT", body),
   getPlans: <T>() => request<T>("/baking-plans"),
   createPlan: <T>(body: unknown) => send<T>("/baking-plans", "POST", body),
+  updatePlan: <T>(planHeaderId: number, body: unknown) => send<T>(`/baking-plans/${planHeaderId}`, "PUT", body),
+  deletePlan: <T>(planHeaderId: number) => remove<T>(`/baking-plans/${planHeaderId}`),
+  deactivatePlan: <T>(planHeaderId: number) => send<T>(`/baking-plans/${planHeaderId}/deactivate`, "POST", {}),
+  activatePlan: <T>(planHeaderId: number) => send<T>(`/baking-plans/${planHeaderId}/activate`, "POST", {}),
   getBatches: <T>() => request<T>("/batches"),
   getOperatorEntries: <T>() => request<T>("/batches/entries"),
+  getOperatorEntryPhoto: <T>(entryId: string) => request<T>(`/batches/entries/${entryId}/photo`),
   createOperatorEntry: <T>(body: unknown) => send<T>("/batches/entries", "POST", body),
   getWaste: <T>() => request<T>("/waste"),
+  getWastePhoto: <T>(wasteEntryId: number) => request<T>(`/waste/${wasteEntryId}/photo`),
   createWaste: <T>(body: unknown) => send<T>("/waste", "POST", body),
   getAlerts: <T>() => request<T>("/alerts"),
   getPlanVsActual: <T>() => request<T>("/reports/plan-vs-actual"),

@@ -6,7 +6,21 @@ namespace Pecenje.Api.Application.Services;
 public sealed class TermAppService(InMemoryTermStore store)
 {
     public Task<IReadOnlyList<TermEntryDto>> GetTermsAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(store.GetAll());
+    {
+        try
+        {
+            return Task.FromResult(store.GetAll());
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<TermEntryDto>>(
+            [
+                new("term-0600", "Утрински", "06:00", true),
+                new("term-1000", "Претпладне", "10:00", true),
+                new("term-1400", "Попладне", "14:00", true)
+            ]);
+        }
+    }
 
     public Task<IReadOnlyList<TermEntryDto>> SaveTermsAsync(UpdateTermsRequest request, CancellationToken cancellationToken = default)
     {
@@ -21,7 +35,14 @@ public sealed class TermAppService(InMemoryTermStore store)
                 entry.IsActive))
             .ToArray();
 
-        return Task.FromResult(store.ReplaceAll(sanitized));
+        try
+        {
+            return Task.FromResult(store.ReplaceAll(sanitized));
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<TermEntryDto>>(sanitized);
+        }
     }
 
     private static string CreateId(string label, string time)

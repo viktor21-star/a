@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { isAdministrator, useAuth } from "../lib/auth";
+import { playFeedback } from "../lib/feedback";
 import { syncPendingOperatorEntries, syncPendingWasteEntries } from "../lib/operatorEntryQueue";
 
 export function AppShell() {
@@ -11,14 +12,18 @@ export function AppShell() {
   const navigate = useNavigate();
   const adminMode = isAdministrator(user);
   const isHome = location.pathname === "/";
+  const operatorTitle = getOperatorTitle(location.pathname, location.search);
 
   useEffect(() => {
     void syncPendingOperatorEntries();
     void syncPendingWasteEntries();
 
     const handleOnline = () => {
-      void syncPendingOperatorEntries();
-      void syncPendingWasteEntries();
+      void Promise.all([syncPendingOperatorEntries(), syncPendingWasteEntries()]).then(([operatorSynced, wasteSynced]) => {
+        if (operatorSynced + wasteSynced > 0) {
+          playFeedback("synced", "Локалните внесови се испратени");
+        }
+      });
     };
 
     window.addEventListener("online", handleOnline);
@@ -31,8 +36,9 @@ export function AppShell() {
         <main className="content content--operator">
           <header className="topbar topbar--operator">
             <div>
+              <img className="app-logo app-logo--topbar" src="/zito-logo.png" alt="Жито маркети" />
               <p className="topbar-eyebrow">Оператор</p>
-              <h2>Внес на печење</h2>
+              <h2>{operatorTitle}</h2>
             </div>
 
             <div className="topbar-actions">
@@ -56,6 +62,7 @@ export function AppShell() {
       <main className="content content--operator">
         <header className="topbar topbar--operator">
           <div>
+            <img className="app-logo app-logo--topbar" src="/zito-logo.png" alt="Жито маркети" />
             <p className="topbar-eyebrow">Администратор</p>
             <h2>{isHome ? "Админ модули" : "Админ модул"}</h2>
           </div>
@@ -79,4 +86,33 @@ export function AppShell() {
       </main>
     </div>
   );
+}
+
+function getOperatorTitle(pathname: string, search: string) {
+  if (pathname === "/") {
+    return "Избери дел за внес";
+  }
+
+  if (pathname !== "/production") {
+    return "Операторски модул";
+  }
+
+  const mode = new URLSearchParams(search).get("mode");
+  if (mode === "pekara") {
+    return "Внес за Пекара";
+  }
+
+  if (mode === "pecenjara") {
+    return "Внес за Печењара";
+  }
+
+  if (mode === "pijara") {
+    return "Пријава од Пијара";
+  }
+
+  if (mode === "waste") {
+    return "Пријава на отпад";
+  }
+
+  return "Избери дел за внес";
 }

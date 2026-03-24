@@ -6,7 +6,16 @@ namespace Pecenje.Api.Application.Services;
 public sealed class OvenConfigAppService(InMemoryLocationOvenStore store)
 {
     public Task<IReadOnlyList<LocationOvenConfigDto>> GetLocationOvensAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(store.GetAll());
+    {
+        try
+        {
+            return Task.FromResult(store.GetAll());
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<LocationOvenConfigDto>>([]);
+        }
+    }
 
     public Task<IReadOnlyList<LocationOvenConfigDto>> SaveLocationOvensAsync(UpdateLocationOvensRequest request, CancellationToken cancellationToken = default)
     {
@@ -19,7 +28,14 @@ public sealed class OvenConfigAppService(InMemoryLocationOvenStore store)
                 SanitizeMode(entry.Pecenjara)))
             .ToArray();
 
-        return Task.FromResult(store.ReplaceAll(sanitized));
+        try
+        {
+            return Task.FromResult(store.ReplaceAll(sanitized));
+        }
+        catch
+        {
+            return Task.FromResult<IReadOnlyList<LocationOvenConfigDto>>(sanitized);
+        }
     }
 
     private static OvenModeConfigDto SanitizeMode(OvenModeConfigDto? mode)

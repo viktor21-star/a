@@ -1,6 +1,6 @@
 import { isAdministrator, isOperator, useAuth } from "../lib/auth";
 import { PageState } from "../components/PageState";
-import { useUserLocations } from "../lib/queries";
+import { useLocations, useUserLocations } from "../lib/queries";
 
 const adminModules = [
   {
@@ -34,22 +34,10 @@ const adminModules = [
     imageClass: "home-card--reports"
   },
   {
-    title: "Локации",
-    description: "Маркетите што се користат во план, печење и извештаи.",
-    path: "/master-data/locations",
-    imageClass: "home-card--locations"
-  },
-  {
-    title: "Шифарници",
+    title: "Шифрарници",
     description: "Артикли, термини, печки и системски поставки.",
     path: "/master-data",
     imageClass: "home-card--master-data"
-  },
-  {
-    title: "Корисници",
-    description: "Корисници, локации, дозволи и тип на печка по локација.",
-    path: "/user-access",
-    imageClass: "home-card--users"
   },
   {
     title: "Верзија",
@@ -62,6 +50,7 @@ const adminModules = [
 export function HomePage() {
   const { user } = useAuth();
   const permissionsQuery = useUserLocations(user?.id ?? null);
+  const locationsQuery = useLocations(true);
 
   if (isOperator(user) && permissionsQuery.isLoading) {
     return <PageState message="Се вчитуваат операторските привилегии..." />;
@@ -72,6 +61,14 @@ export function HomePage() {
       ?? (permissionsQuery.data?.data ?? [])[0]
       ?? null
     : null;
+
+  const activeLocationLabel = !isAdministrator(user) && activePermission
+    ? formatLocationLabel(
+        locationsQuery.data?.data.find((entry) => entry.locationId === activePermission.locationId)?.code,
+        locationsQuery.data?.data.find((entry) => entry.locationId === activePermission.locationId)?.nameMk ??
+          activePermission.locationName
+      )
+    : "Нема";
 
   const operatorAccess = activePermission
     ? {
@@ -86,6 +83,13 @@ export function HomePage() {
       }
     : { pekara: false, pecenjara: false, pijara: false, waste: false };
 
+  const operatorModules = [
+    operatorAccess.pekara ? "Пекара" : null,
+    operatorAccess.pecenjara ? "Печењара" : null,
+    operatorAccess.pijara ? "Пијара" : null,
+    operatorAccess.waste ? "Отпад" : null
+  ].filter(Boolean);
+
   if (!isAdministrator(user)) {
     if (!operatorAccess.pekara && !operatorAccess.pecenjara && !operatorAccess.pijara && !operatorAccess.waste) {
       return <PageState message="Операторот нема доделени модули за избраната работна локација." />;
@@ -97,9 +101,26 @@ export function HomePage() {
           <div>
             <p className="topbar-eyebrow">Оператор</p>
             <h3>Избери дел за внес</h3>
-            <p className="meta">Се прикажуваат само модулите што се дозволени за работната локација на операторот.</p>
+            <p className="meta">
+              Работна локација: {activeLocationLabel} · Модули: {operatorModules.join(", ")}
+            </p>
           </div>
         </header>
+
+        <section className="admin-hero-grid">
+          <article className="admin-stat-tile">
+            <span>Работна локација</span>
+            <strong>{activeLocationLabel}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Достапни модули</span>
+            <strong>{operatorModules.length}</strong>
+          </article>
+          <article className="admin-stat-tile">
+            <span>Активни работни позиции</span>
+            <strong>{operatorModules.join(", ") || "-"}</strong>
+          </article>
+        </section>
 
         <section className="operator-home-grid">
           {operatorAccess.pekara && (
@@ -180,7 +201,6 @@ export function HomePage() {
         <div>
           <p className="topbar-eyebrow">Администратор</p>
           <h3>Админ модули</h3>
-          <p className="meta">Секој модул е голема кочка. Клик отвора full-screen модул, а горе има Назад за враќање.</p>
         </div>
       </header>
 
@@ -206,4 +226,17 @@ export function HomePage() {
       </section>
     </section>
   );
+}
+
+function formatLocationLabel(code: string | undefined, name: string) {
+  const normalizedName = isGenericLocationName(name) ? "" : name;
+  if (code && normalizedName) {
+    return `${code} · ${normalizedName}`;
+  }
+
+  return code || normalizedName || name;
+}
+
+function isGenericLocationName(name: string) {
+  return /^локација\s+\d+$/i.test(name.trim());
 }

@@ -20,7 +20,7 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
         await connection.OpenAsync(cancellationToken);
         var rows = await connection.QueryAsync<UserSummaryRow>(
             """
-            SELECT UserId, Username, FullName, RoleCode, IsActive
+            SELECT UserId, Username, FullName, RoleCode, IsActive, DefaultLocationId
             FROM LocalUsers
             ORDER BY FullName
             """);
@@ -32,6 +32,20 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
         using var connection = localAppDb.CreateConnection();
         await connection.OpenAsync(cancellationToken);
         using var transaction = connection.BeginTransaction();
+
+        var existingUser = await connection.ExecuteScalarAsync<long>(
+            """
+            SELECT COUNT(1)
+            FROM LocalUsers
+            WHERE lower(Username) = lower(@Username)
+            """,
+            new { request.Username },
+            transaction);
+
+        if (existingUser > 0)
+        {
+            throw new InvalidOperationException("Корисничкото име веќе постои.");
+        }
 
         var nextId = await connection.ExecuteScalarAsync<long>(
             "SELECT COALESCE(MAX(UserId), 0) + 1 FROM LocalUsers",
@@ -83,7 +97,7 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
             transaction);
 
         transaction.Commit();
-        return new UserSummaryDto(nextId, request.Username, request.FullName, request.RoleCode, request.IsActive);
+        return new UserSummaryDto(nextId, request.Username, request.FullName, request.RoleCode, request.IsActive, request.DefaultLocationId);
     }
 
     public async Task<UserSummaryDto> UpdateUserAccountAsync(long userId, UpdateUserAccountRequest request, CancellationToken cancellationToken = default)
@@ -111,7 +125,7 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
 
         var updated = await connection.QuerySingleAsync<UserSummaryRow>(
             """
-            SELECT UserId, Username, FullName, RoleCode, IsActive
+            SELECT UserId, Username, FullName, RoleCode, IsActive, DefaultLocationId
             FROM LocalUsers
             WHERE UserId = @UserId
             """,
@@ -264,7 +278,7 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
     }
 
     private static UserSummaryDto MapSummary(UserSummaryRow row)
-        => new(row.UserId, row.Username, row.FullName, row.RoleCode, row.IsActive);
+        => new(row.UserId, row.Username, row.FullName, row.RoleCode, row.IsActive, row.DefaultLocationId);
 
     private static UserLocationPermissionDto MapPermission(UserLocationRow row)
         => new(
@@ -289,27 +303,39 @@ public sealed class SqliteUserAccessRepository : IUserAccessRepository
             _ => $"Локација {locationId}"
         };
 
-    private sealed record UserSummaryRow(long UserId, string Username, string FullName, string RoleCode, bool IsActive);
+    private sealed class UserSummaryRow
+    {
+        public long UserId { get; init; }
+        public string Username { get; init; } = string.Empty;
+        public string FullName { get; init; } = string.Empty;
+        public string RoleCode { get; init; } = string.Empty;
+        public bool IsActive { get; init; }
+        public int? DefaultLocationId { get; init; }
+    }
 
-    private sealed record UserLocationRow(
-        int LocationId,
-        string LocationName,
-        bool CanPlan,
-        bool CanBake,
-        bool CanRecordWaste,
-        bool CanViewReports,
-        bool CanApprovePlan,
-        bool CanUsePekara,
-        bool CanUsePecenjara,
-        bool CanUsePijara,
-        string? PekaraOvenType,
-        string? PecenjaraOvenType);
+    private sealed class UserLocationRow
+    {
+        public int LocationId { get; init; }
+        public string LocationName { get; init; } = string.Empty;
+        public bool CanPlan { get; init; }
+        public bool CanBake { get; init; }
+        public bool CanRecordWaste { get; init; }
+        public bool CanViewReports { get; init; }
+        public bool CanApprovePlan { get; init; }
+        public bool CanUsePekara { get; init; }
+        public bool CanUsePecenjara { get; init; }
+        public bool CanUsePijara { get; init; }
+        public string? PekaraOvenType { get; init; }
+        public string? PecenjaraOvenType { get; init; }
+    }
 
-    private sealed record AuthenticatedUserRow(
-        long UserId,
-        string Username,
-        string FullName,
-        string RoleCode,
-        int? DefaultLocationId,
-        bool IsActive);
+    private sealed class AuthenticatedUserRow
+    {
+        public long UserId { get; init; }
+        public string Username { get; init; } = string.Empty;
+        public string FullName { get; init; } = string.Empty;
+        public string RoleCode { get; init; } = string.Empty;
+        public int? DefaultLocationId { get; init; }
+        public bool IsActive { get; init; }
+    }
 }

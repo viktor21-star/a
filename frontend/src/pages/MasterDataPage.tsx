@@ -5,6 +5,7 @@ import { isAdministrator, useAuth } from "../lib/auth";
 const masterSections = [
   { title: "Локации", description: "Маркетите што влегуваат во планот, реализацијата и алармите.", previewPath: "/master-data/locations" },
   { title: "Артикли", description: "Артикли што се планираат и се печат по локација.", previewPath: "/master-data/items" },
+  { title: "Типови на печка", description: "Шифарник за типови на печка што се користат во Пекара и Печењара.", previewPath: "/master-data/oven-types", editPath: "/master-data/oven-types" },
   { title: "Печки", description: "Типови на печка и број на печки по локација.", previewPath: "/master-data/ovens", editPath: "/master-data/ovens" },
   { title: "Термини", description: "Часови и прозорци кога треба да биде готово печењето.", previewPath: "/master-data/terms", editPath: "/master-data/terms" },
   { title: "Корисници", description: "Кој корисник за која локација работи и што смее да прави.", previewPath: "/user-access", editPath: "/user-access" },
@@ -15,7 +16,7 @@ export function MasterDataPage() {
   const { user } = useAuth();
 
   if (!isAdministrator(user)) {
-    return <PageState message="Шифарниците ги одржува администратор." />;
+    return <PageState message="Шифрарниците ги одржува администратор." />;
   }
 
   return (
@@ -23,13 +24,21 @@ export function MasterDataPage() {
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Администрација</p>
-          <h3>Шифарници и системски поставки</h3>
+          <h3>Шифрарници и системски поставки</h3>
           <p className="meta">
-            Шифарник е основната листа што ја користи целиот систем: локации, артикли, печки, термини и причини.
-            Ако нешто не е добро во шифарник, нема да биде добро ниту во план, реализација, аларми и извештаи.
+            Шифрарник е основната листа што ја користи целиот систем: локации, артикли, печки, термини и причини.
+            Ако нешто не е добро во шифрарник, нема да биде добро ниту во план, реализација, аларми и извештаи.
           </p>
         </div>
       </header>
+
+      <div className="operator-explainer">
+        <strong>Како да постапиш во Шифрарници:</strong>
+        <span>1. `Локации` и `Артикли` се само за преглед на податоци од source системот.</span>
+        <span>2. `Печки`, `Термини` и `Причини` се деловите што се менуваат.</span>
+        <span>3. `Корисници` служи за отворање и одржување на корисници и привилегии.</span>
+        <span>4. За секој модул прво отвори `Преглед`, а каде што е дозволено користи `Измени`.</span>
+      </div>
 
       <div className="card-list reports-grid">
         {masterSections.map((section) => (

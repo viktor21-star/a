@@ -10,16 +10,7 @@ public sealed class DemoPlanningRepository(
 {
     public Task<IReadOnlyList<BakingPlanCardDto>> GetDailyPlansAsync(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<BakingPlanCardDto> manualPlans;
-        try
-        {
-            manualPlans = manualPlanningStore.GetAll();
-        }
-        catch
-        {
-            manualPlans = [];
-        }
-
+        var manualPlans = manualPlanningStore.GetAll();
         var plans = demoDataService.GetPlans().Concat(manualPlans).ToArray();
         return Task.FromResult<IReadOnlyList<BakingPlanCardDto>>(plans);
     }
@@ -27,24 +18,23 @@ public sealed class DemoPlanningRepository(
     public Task<BakingPlanCardDto> CreateManualPlanAsync(CreateManualPlanRequest request, CancellationToken cancellationToken = default)
     {
         var locationName = demoDataService.GetLocationName(request.LocationId);
-        try
-        {
-            return Task.FromResult(manualPlanningStore.Add(request, locationName));
-        }
-        catch
-        {
-            return Task.FromResult(new BakingPlanCardDto(
-                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                DateOnly.FromDateTime(DateTime.Today),
-                request.LocationId,
-                locationName,
-                request.Mode == "pecenjara" ? "Печењара" : "Пекара",
-                request.PlannedTime,
-                request.Mode == "pecenjara" ? "Печењара" : "Пекара",
-                0,
-                request.PlannedQty,
-                request.Mode,
-                "рачно"));
-        }
+        return Task.FromResult(manualPlanningStore.Add(request, locationName));
+    }
+
+    public Task<BakingPlanCardDto> UpdateManualPlanAsync(long planHeaderId, UpdateManualPlanRequest request, CancellationToken cancellationToken = default)
+    {
+        var locationName = demoDataService.GetLocationName(request.LocationId);
+        return Task.FromResult(manualPlanningStore.Update(planHeaderId, request, locationName));
+    }
+
+    public Task DeleteManualPlanAsync(long planHeaderId, CancellationToken cancellationToken = default)
+    {
+        manualPlanningStore.Delete(planHeaderId);
+        return Task.CompletedTask;
+    }
+
+    public Task<BakingPlanCardDto> UpdateManualPlanStatusAsync(long planHeaderId, string status, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(manualPlanningStore.UpdateStatus(planHeaderId, status));
     }
 }

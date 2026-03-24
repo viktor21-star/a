@@ -121,6 +121,11 @@ export type WasteEntry = {
   operatorName: string;
 };
 
+export type PhotoAsset = {
+  photoDataUrl: string;
+  photoName: string;
+};
+
 export type Alert = {
   alertId: number;
   locationId: number;
@@ -135,6 +140,12 @@ export type PlanVsActualReport = {
   rows: Array<{
     locationName: string;
     itemName: string;
+    mode: "pekara" | "pecenjara";
+    planDate: string;
+    plannedTime: string;
+    actualTime?: string | null;
+    delayMinutes?: number | null;
+    timingStatus: string;
     plannedQty: number;
     bakedQty: number;
     differenceQty: number;
@@ -246,6 +257,7 @@ export type UserSummary = {
   fullName: string;
   roleCode: string;
   isActive: boolean;
+  defaultLocationId?: number | null;
 };
 
 export type LoginRequest = {

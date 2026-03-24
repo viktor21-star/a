@@ -5,5 +5,6 @@ public sealed record UserSummaryDto(
     string Username,
     string FullName,
     string RoleCode,
-    bool IsActive
+    bool IsActive,
+    int? DefaultLocationId
 );

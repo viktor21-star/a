@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageState } from "../components/PageState";
 import { isAdministrator, useAuth } from "../lib/auth";
-import { useBatches, useCreateOperatorEntry, useCreateWasteEntry, useItems, usePlans, useReasons, useUserLocations, useWasteEntries } from "../lib/queries";
+import { api } from "../lib/api";
+import { playFeedback } from "../lib/feedback";
+import { useCreateOperatorEntry, useCreateWasteEntry, useItems, useLocations, useOperatorEntries, usePlans, useReasons, useUserLocations, useWasteEntries } from "../lib/queries";
 import { createLocalId, queuePendingOperatorEntry, queuePendingWasteEntry, shouldQueueOffline } from "../lib/operatorEntryQueue";
 import type { CreateOperatorEntryRequest, CreateWasteEntryRequest, Item, OperatorEntryLine } from "../lib/types";
 
@@ -10,14 +12,18 @@ type EntryMode = ItemMode | "waste";
 
 export function ProductionPage() {
   const { user } = useAuth();
-  const batchesQuery = useBatches();
+  const operatorEntriesQuery = useOperatorEntries();
   const wasteQuery = useWasteEntries();
   const itemsQuery = useItems();
   const plansQuery = usePlans();
   const reasonsQuery = useReasons();
+  const locationsQuery = useLocations(true);
   const createEntryMutation = useCreateOperatorEntry();
   const createWasteMutation = useCreateWasteEntry();
   const permissionsQuery = useUserLocations(user?.id ?? null);
+  const [adminMode, setAdminMode] = useState<ItemMode>("pekara");
+  const [previewPhoto, setPreviewPhoto] = useState<{ src: string; title: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState<EntryMode | null>(null);
   const [draft, setDraft] = useState({ note: "", photoDataUrl: "", photoName: "" });
   const [draftItems, setDraftItems] = useState<OperatorEntryLine[]>([]);
@@ -64,6 +70,19 @@ export function ProductionPage() {
     return assignedLocations.find((entry) => entry.locationId === user?.defaultLocationId) ?? assignedLocations[0];
   }, [assignedLocations, user?.defaultLocationId]);
 
+  const activeLocationLabel = useMemo(() => {
+    if (!activeLocation) {
+      return "Нема";
+    }
+
+    const matchedLocation = locationsQuery.data?.data.find((entry) => entry.locationId === activeLocation.locationId);
+    return formatLocationLabel(matchedLocation?.code, matchedLocation?.nameMk ?? activeLocation.locationName);
+  }, [activeLocation, locationsQuery.data]);
+
+  const needsReasons = selectedMode === "waste";
+  const needsPlans = selectedMode !== null && selectedMode !== "pijara" && selectedMode !== "waste";
+  const needsItems = selectedMode !== null;
+
   const modeAccess = useMemo(() => {
     const permission = activeLocation
       ? (permissionsQuery.data?.data ?? []).find((entry) => entry.locationId === activeLocation.locationId) ?? null
@@ -81,6 +100,27 @@ export function ProductionPage() {
       )
     };
   }, [activeLocation, permissionsQuery.data]);
+
+  function resetSharedDraftState() {
+    setDraft({ note: "", photoDataUrl: "", photoName: "" });
+    setSaveError(null);
+    setSaveConfirmation(null);
+  }
+
+  function resetEntryState() {
+    resetSharedDraftState();
+    setDraftItems([]);
+    setItemSearch("");
+  }
+
+  function resetWasteState() {
+    resetSharedDraftState();
+    setWasteSource(null);
+    setWasteItemSearch("");
+    setWasteItemName("");
+    setWasteQuantity(1);
+    setWasteReason("");
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -121,6 +161,32 @@ export function ProductionPage() {
   }, [modeAccess, selectedMode]);
 
   useEffect(() => {
+    if (!selectedMode) {
+      resetEntryState();
+      setWasteSource(null);
+      return;
+    }
+
+    if (selectedMode === "waste") {
+      resetWasteState();
+      return;
+    }
+
+    resetEntryState();
+  }, [selectedMode]);
+
+  useEffect(() => {
+    if (!selectedMode) {
+      return;
+    }
+
+    const nextUrl = `/production?mode=${selectedMode}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      window.history.replaceState({}, "", nextUrl);
+    }
+  }, [selectedMode]);
+
+  useEffect(() => {
     if (selectedMode === "waste") {
       return;
     }
@@ -128,10 +194,12 @@ export function ProductionPage() {
 
   useEffect(() => {
     if (selectedMode === "waste") {
-      const firstItem = availableItems[0]?.nameMk ?? "";
-      if (!wasteItemName || !availableItems.some((item) => item.nameMk === wasteItemName)) {
-        setWasteItemName(firstItem);
-        setWasteItemSearch(firstItem);
+      if (wasteItemName && !availableItems.some((item) => item.nameMk === wasteItemName)) {
+        setWasteItemName("");
+      }
+
+      if (wasteItemSearch && !availableItems.some((item) => [item.nameMk, item.code].some((value) => value.toLowerCase().includes(wasteItemSearch.trim().toLowerCase())))) {
+        setWasteItemSearch("");
       }
       return;
     }
@@ -154,12 +222,36 @@ export function ProductionPage() {
     return () => window.clearTimeout(timer);
   }, [saveConfirmation]);
 
-  if (permissionsQuery.isLoading || itemsQuery.isLoading || plansQuery.isLoading || reasonsQuery.isLoading) {
-    return <PageState message="Се вчитуваат оперативните податоци..." />;
+  if (
+    permissionsQuery.isLoading ||
+    (needsItems && itemsQuery.isLoading) ||
+    (needsPlans && plansQuery.isLoading) ||
+    (needsReasons && reasonsQuery.isLoading)
+  ) {
+    const loadingParts = [
+      permissionsQuery.isLoading ? "привилегии" : null,
+      needsItems && itemsQuery.isLoading ? "артикли" : null,
+      needsPlans && plansQuery.isLoading ? "планови" : null,
+      needsReasons && reasonsQuery.isLoading ? "причини" : null
+    ].filter(Boolean);
+
+    return <PageState message={`Се вчитуваат оперативните податоци${loadingParts.length ? `: ${loadingParts.join(", ")}` : "..."}`} />;
   }
 
-  if (permissionsQuery.isError || itemsQuery.isError || plansQuery.isError || reasonsQuery.isError) {
-    return <PageState message="Не може да се вчита оперативниот модул." />;
+  if (
+    permissionsQuery.isError ||
+    (needsItems && itemsQuery.isError) ||
+    (needsPlans && plansQuery.isError) ||
+    (needsReasons && reasonsQuery.isError)
+  ) {
+    const errorParts = [
+      permissionsQuery.isError ? "привилегии" : null,
+      needsItems && itemsQuery.isError ? "артикли" : null,
+      needsPlans && plansQuery.isError ? "планови" : null,
+      needsReasons && reasonsQuery.isError ? "причини" : null
+    ].filter(Boolean);
+
+    return <PageState message={`Не може да се вчита оперативниот модул${errorParts.length ? `: ${errorParts.join(", ")}` : "."}`} />;
   }
 
   if (selectedMode && selectedMode !== "waste" && !availableItems.length) {
@@ -197,23 +289,7 @@ export function ProductionPage() {
                       ? "Отпад"
                     : "Избери тип на внес"}
             </h3>
-            <p className="meta">
-              {selectedMode
-                ? "Овој модул е на цел екран. Со Назад се враќаш на двете големи кочки."
-                : "Операторот гледа Пекара, Печењара, Пијара и Отпад. После изборот внесува артикли, количини и задолжителна слика."}
-            </p>
           </div>
-          {selectedMode && (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={() => {
-                window.location.href = "/";
-              }}
-            >
-              Назад
-            </button>
-          )}
         </header>
 
         {!selectedMode && (
@@ -273,13 +349,25 @@ export function ProductionPage() {
                   ? "Пекара"
                   : selectedMode === "pecenjara"
                     ? "Печењара"
-                    : "Пијара"}
+                    : "Пијара · Пријава"}
               </h3>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  resetEntryState();
+                  setSelectedMode(null);
+                  window.history.replaceState({}, "", "/production");
+                  window.location.href = "/";
+                }}
+              >
+                Назад
+              </button>
             </div>
 
             <div className="operator-explainer">
               <strong>Како се внесува:</strong>
-              <span>Работна локација: {activeLocation?.locationName}</span>
+              <span>Работна локација: {activeLocationLabel}</span>
               {selectedMode === "pijara" ? (
                 <>
                   <span>1. Една пријава е една слика. Без слика не може да се сними.</span>
@@ -334,6 +422,7 @@ export function ProductionPage() {
                     accept="image/*"
                     capture="environment"
                     onChange={async (event) => {
+                      setSaveError(null);
                       const file = event.target.files?.[0];
                       if (!file) {
                         setDraft((current) => ({ ...current, photoDataUrl: "", photoName: "" }));
@@ -420,7 +509,7 @@ export function ProductionPage() {
 
                   {draftItems.length > 0 && (
                     <div className="operator-selected-items">
-                      <strong>Избрани артикли</strong>
+                      <strong>Избрани артикли · {draftItems.length}</strong>
                       <div className="operator-lines-grid">
                         {draftItems.map((entry) => (
                           <div className="operator-line-row operator-line-row--checkbox" key={`selected-${entry.itemName}`}>
@@ -531,11 +620,12 @@ export function ProductionPage() {
                 <article className="operator-step-card operator-step-card--done">
                   <div className="operator-step-card__header">
                     <span className="pill">Чекор 4</span>
-                    <strong>Сними внес</strong>
+                    <strong>{selectedMode === "pijara" ? "Сними пријава" : "Сними внес"}</strong>
                   </div>
                   <button
                     className="action-button"
                     type="button"
+                    disabled={createEntryMutation.isPending}
                     onClick={() => {
                       if (readyItems.length === 0 || !draft.photoDataUrl) {
                         return;
@@ -555,10 +645,8 @@ export function ProductionPage() {
                       };
                       createEntryMutation.mutate(nextEntry, {
                         onSuccess: () => {
-                          setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                          setDraftItems([]);
-                          setItemSearch("");
-                          triggerSuccessFeedback("Успешен внес");
+                          resetEntryState();
+                          playFeedback("success", "Успешен внес");
                           setSaveConfirmation(
                             `${selectedMode === "pekara" ? "Пекара" : selectedMode === "pecenjara" ? "Печењара" : "Пијара"} · ${readyItems.length} артикли`
                           );
@@ -569,21 +657,19 @@ export function ProductionPage() {
                               ...nextEntry,
                               localId: createLocalId()
                             });
-                            setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                            setDraftItems([]);
-                            setItemSearch("");
-                            triggerSuccessFeedback("Снимено локално");
+                            resetEntryState();
+                            playFeedback("offline", "Снимено локално");
                             setSaveConfirmation("Нема интернет. Внесот е снимен локално и ќе се испрати автоматски.");
                             return;
                           }
 
                           setSaveError("Неуспешен внес. Провери дали интернетот и серверот работат, па пробај повторно. Ако проблемот остане, контактирај администратор.");
-                          triggerErrorFeedback("Неуспешен внес");
+                          playFeedback("error", "Неуспешен внес");
                         }
                       });
                     }}
                   >
-                    {createEntryMutation.isPending ? "Се снима..." : "Сними внес"}
+                    {createEntryMutation.isPending ? "Се снима..." : selectedMode === "pijara" ? "Сними пријава" : "Сними внес"}
                   </button>
                 </article>
               )}
@@ -595,11 +681,23 @@ export function ProductionPage() {
           <section className="panel operator-entry-panel">
             <div className="panel-header">
               <h3>Пријава на отпад</h3>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => {
+                  resetWasteState();
+                  setSelectedMode(null);
+                  window.history.replaceState({}, "", "/production");
+                  window.location.href = "/";
+                }}
+              >
+                Назад
+              </button>
             </div>
 
             <div className="operator-explainer">
               <strong>Како се пријавува отпад:</strong>
-              <span>Работна локација: {activeLocation?.locationName}</span>
+              <span>Работна локација: {activeLocationLabel}</span>
               <span>1. Избери од кој дел е отпадот: Пекара, Печењара или Пијара.</span>
               <span>2. Сликај го отпадот. Една пријава е една слика.</span>
               <span>3. Избери артикал. Ќе се прикажат само артиклите за избраниот дел.</span>
@@ -631,6 +729,7 @@ export function ProductionPage() {
                         type="button"
                         className={`operator-mode-card${wasteSource === mode ? " operator-mode-card--active" : ""}`}
                         onClick={() => {
+                          setSaveError(null);
                           setWasteSource(mode);
                           setWasteItemName("");
                           setWasteItemSearch("");
@@ -662,6 +761,7 @@ export function ProductionPage() {
                       accept="image/*"
                       capture="environment"
                       onChange={async (event) => {
+                        setSaveError(null);
                         const file = event.target.files?.[0];
                         if (!file) {
                           setDraft((current) => ({ ...current, photoDataUrl: "", photoName: "" }));
@@ -772,6 +872,7 @@ export function ProductionPage() {
                   <button
                     className="action-button"
                     type="button"
+                    disabled={createWasteMutation.isPending}
                     onClick={() => {
                       if (!wasteSource || !draft.photoDataUrl || !wasteItemName || !wasteReason || wasteQuantity <= 0) {
                         return;
@@ -794,13 +895,8 @@ export function ProductionPage() {
 
                       createWasteMutation.mutate(request, {
                         onSuccess: () => {
-                          setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                          setWasteSource(null);
-                          setWasteItemSearch("");
-                          setWasteItemName("");
-                          setWasteQuantity(1);
-                          setWasteReason("");
-                          triggerSuccessFeedback("Успешна пријава на отпад");
+                          resetWasteState();
+                          playFeedback("success", "Успешна пријава на отпад");
                           setSaveConfirmation(`Отпад · ${request.locationName} · ${request.itemName}`);
                         },
                         onError: (error) => {
@@ -809,19 +905,14 @@ export function ProductionPage() {
                               ...request,
                               localId: createLocalId()
                             });
-                            setDraft({ note: "", photoDataUrl: "", photoName: "" });
-                            setWasteSource(null);
-                            setWasteItemSearch("");
-                            setWasteItemName("");
-                            setWasteQuantity(1);
-                            setWasteReason("");
-                            triggerSuccessFeedback("Отпад снимен локално");
+                            resetWasteState();
+                            playFeedback("offline", "Отпад снимен локално");
                             setSaveConfirmation("Нема интернет. Отпадот е снимен локално и ќе се испрати автоматски.");
                             return;
                           }
 
                           setSaveError("Неуспешна пријава на отпад. Провери дали интернетот и серверот работат, па пробај повторно. Ако проблемот остане, контактирај администратор.");
-                          triggerErrorFeedback("Неуспешна пријава на отпад");
+                          playFeedback("error", "Неуспешна пријава на отпад");
                         }
                       });
                     }}
@@ -837,12 +928,12 @@ export function ProductionPage() {
     );
   }
 
-  if (batchesQuery.isLoading) {
-    return <PageState message="Се вчитуваат турите..." />;
+  if (operatorEntriesQuery.isLoading) {
+    return <PageState message="Се вчитуваат внесовите..." />;
   }
 
-  if (batchesQuery.isError || !batchesQuery.data) {
-    return <PageState message="Не може да се вчитаат турите." />;
+  if (operatorEntriesQuery.isError || !operatorEntriesQuery.data) {
+    return <PageState message="Не може да се вчита реалното печење." />;
   }
 
   return (
@@ -851,23 +942,83 @@ export function ProductionPage() {
         <div>
           <p className="topbar-eyebrow">Администратор</p>
           <h3>Преглед на реално печење</h3>
-          <p className="meta">Администраторот ги гледа турите, отпадот и дисциплината по локации.</p>
+          <p className="meta">Администраторот ги гледа вистинските операторски внесови, по локација, модул и време.</p>
         </div>
       </header>
 
+      <section className="operator-mode-grid">
+        <button
+          type="button"
+          className={`operator-mode-card${adminMode === "pekara" ? " operator-mode-card--active" : ""}`}
+          onClick={() => setAdminMode("pekara")}
+        >
+          <strong>Пекара</strong>
+          <span>Преглед на внесови за пекарските производи.</span>
+        </button>
+        <button
+          type="button"
+          className={`operator-mode-card${adminMode === "pecenjara" ? " operator-mode-card--active" : ""}`}
+          onClick={() => setAdminMode("pecenjara")}
+        >
+          <strong>Печењара</strong>
+          <span>Преглед на внесови за печењара.</span>
+        </button>
+      </section>
+
+      <div className="operator-explainer">
+        <strong>Како се користи овој дел:</strong>
+        <span>1. Одбери дали гледаш Пекара или Печењара.</span>
+        <span>2. Лево се гледаат сите последни операторски внесови за избраниот модул.</span>
+        <span>3. За секој внес се проверува локација, оператор, време и точните артикли.</span>
+        <span>3. Десно се гледа последно пријавениот отпад за брз увид.</span>
+        <span>4. За споредба со планот и анализа продолжи во `Аларми` и `Извештаи`.</span>
+      </div>
+
       <div className="panel-grid panel-grid--production">
         <div className="card-list">
-          {batchesQuery.data.data.map((batch) => (
-            <article className="workflow-card" key={`${batch.itemName}-${batch.operatorName}-${batch.startTime}`}>
+          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminMode).length === 0 && (
+            <div className="empty-state">Нема снимени внесови за {adminMode === "pekara" ? "Пекара" : "Печењара"}.</div>
+          )}
+          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminMode).map((entry) => (
+            <article className="workflow-card" key={entry.id}>
               <div className="workflow-card__top">
-                <span className="pill">{batch.status}</span>
-                <span className="meta">{batch.operatorName}</span>
+                <span className="pill">
+                  {entry.mode === "pekara" ? "Пекара" : entry.mode === "pecenjara" ? "Печењара" : "Пијара"}
+                </span>
+                <span className="meta">{entry.operatorName}</span>
               </div>
-              <h4>{batch.itemName}</h4>
-              <p>Локација: {batch.locationName}</p>
-              <p>Термин: {batch.termLabel}</p>
-              <p>Испечено: {batch.actualQty}</p>
-              <p>Почеток: {batch.startTime}</p>
+              <h4>
+                {formatLocationLabel(
+                  locationsQuery.data?.data.find((location) => location.locationId === entry.locationId)?.code,
+                  locationsQuery.data?.data.find((location) => location.locationId === entry.locationId)?.nameMk ?? entry.locationName
+                )}
+              </h4>
+              <p>Модул: {entry.mode === "pekara" ? "Пекара" : "Печењара"}</p>
+              <p>Време: {formatAdminTimestamp(entry.createdAt)}</p>
+              <p>Артикли: {entry.items.map((item) => `${item.itemName} (${item.quantity})`).join(", ")}</p>
+              {entry.photoName ? (
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={async () => {
+                    setPreviewLoading(true);
+                    try {
+                      const response = await api.getOperatorEntryPhoto<{ data: { photoDataUrl: string; photoName: string } }>(entry.id);
+                      setPreviewPhoto({
+                        src: response.data.photoDataUrl,
+                        title: `${entry.mode === "pekara" ? "Пекара" : entry.mode === "pecenjara" ? "Печењара" : "Пијара"} · ${entry.locationName}`
+                      });
+                    } catch {
+                      setSaveError("Сликата не може да се отвори.");
+                    } finally {
+                      setPreviewLoading(false);
+                    }
+                  }}
+                >
+                  {previewLoading ? "Се отвора..." : "Отвори слика"}
+                </button>
+              ) : null}
+              {entry.note ? <p>Забелешка: {entry.note}</p> : null}
             </article>
           ))}
         </div>
@@ -883,6 +1034,22 @@ export function ProductionPage() {
           ))}
         </aside>
       </div>
+
+      {previewPhoto && (
+        <div className="image-lightbox" role="dialog" aria-modal="true" onClick={() => setPreviewPhoto(null)}>
+          <div className="image-lightbox__content" onClick={(event) => event.stopPropagation()}>
+            <div className="panel-header">
+              <h3>{previewPhoto.title}</h3>
+              <button type="button" className="ghost-button" onClick={() => setPreviewPhoto(null)}>
+                Затвори
+              </button>
+            </div>
+            <div className="operator-photo-preview image-lightbox__preview">
+              <img src={previewPhoto.src} alt={previewPhoto.title} />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -897,117 +1064,73 @@ function filterItemsForMode(items: Item[], mode: ItemMode | null) {
 
 function matchesMode(item: Item, mode: ItemMode) {
   const groupCode = item.groupCode?.trim();
+  const groupName = item.groupName?.trim().toLowerCase() ?? "";
 
   if (mode === "pekara") {
-    return groupCode === "260";
+    return groupCode === "260" || groupName.includes("пек");
   }
 
   if (mode === "pecenjara") {
-    return groupCode === "251";
+    return groupCode === "251" || groupName.includes("печ");
   }
 
-  return groupCode === "220" || groupCode === "221";
+  return groupCode === "220" || groupCode === "221" || groupName.includes("пиј");
 }
 
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      const originalDataUrl = String(reader.result);
+      const image = new Image();
+
+      image.onload = () => {
+        const maxDimension = 1280;
+        const quality = 0.8;
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+          resolve(originalDataUrl);
+          return;
+        }
+
+        context.drawImage(image, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", quality);
+        resolve(compressed || originalDataUrl);
+      };
+
+      image.onerror = () => resolve(originalDataUrl);
+      image.src = originalDataUrl;
+    };
     reader.onerror = () => reject(new Error("Сликата не може да се вчита."));
     reader.readAsDataURL(file);
   });
 }
 
-function triggerSuccessFeedback(message = "Успешен внес") {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate?.([120, 40, 120]);
+function formatAdminTimestamp(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
   }
 
-  speakFeedback(message);
-
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) {
-    return;
-  }
-
-  try {
-    const audioContext = new AudioContextConstructor();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.22);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.24);
-    oscillator.onended = () => {
-      void audioContext.close();
-    };
-  } catch {
-    // Ignore audio feedback failures and keep save flow successful.
-  }
+  return `${String(parsed.getDate()).padStart(2, "0")}.${String(parsed.getMonth() + 1).padStart(2, "0")}.${parsed.getFullYear()} ${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
 }
 
-function triggerErrorFeedback(message = "Неуспешен внес") {
-  if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-    navigator.vibrate?.([220, 80, 220, 80, 220]);
+function formatLocationLabel(code: string | undefined, name: string) {
+  const normalizedName = isGenericLocationName(name) ? "" : name;
+  if (code && normalizedName) {
+    return `${code} · ${normalizedName}`;
   }
 
-  speakFeedback(message);
-
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) {
-    return;
-  }
-
-  try {
-    const audioContext = new AudioContextConstructor();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = "square";
-    oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.001, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.15, audioContext.currentTime + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.36);
-    oscillator.onended = () => {
-      void audioContext.close();
-    };
-  } catch {
-    // Ignore audio feedback failures.
-  }
+  return code || normalizedName || name;
 }
 
-function speakFeedback(message: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
-
-  try {
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = "mk-MK";
-    utterance.rate = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  } catch {
-    // Ignore speech synthesis failures.
-  }
+function isGenericLocationName(name: string) {
+  return /^локација\s+\d+$/i.test(name.trim());
 }

@@ -23,3 +23,9 @@
 - secret store интеграција
 - automated DB migration pipeline
 - nightly backup verification
+# Deployment
+
+Поврзани production docs:
+
+- [production-checklist.md](./production-checklist.md)
+- [backup-and-restore.md](./backup-and-restore.md)

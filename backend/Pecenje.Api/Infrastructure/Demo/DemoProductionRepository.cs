@@ -1,4 +1,5 @@
 using Pecenje.Api.Application.Abstractions;
+using Pecenje.Api.Contracts.Common;
 using Pecenje.Api.Contracts.Production;
 using Pecenje.Api.Contracts.Waste;
 using Pecenje.Api.Services;
@@ -12,6 +13,34 @@ public sealed class DemoProductionRepository(
 {
     public Task<IReadOnlyList<BatchDetailDto>> GetActiveBatchesAsync(CancellationToken cancellationToken = default)
     {
+        try
+        {
+            var localEntries = operatorEntryStore.GetAll();
+            if (localEntries.Count > 0)
+            {
+                var mapped = localEntries
+                    .SelectMany(entry => entry.Items.Select((item, index) => new BatchDetailDto(
+                        Math.Abs(HashCode.Combine(entry.Id, index)),
+                        entry.LocationId,
+                        item.ItemName,
+                        entry.LocationName,
+                        entry.Mode == "pecenjara" ? "Печењара" : entry.Mode == "pijara" ? "Пијара" : "Пекара",
+                        entry.CreatedAt,
+                        item.Quantity,
+                        "снимено",
+                        entry.OperatorName,
+                        entry.CreatedAt,
+                        null)))
+                    .OrderByDescending(entry => entry.StartTime)
+                    .ToArray();
+
+                return Task.FromResult<IReadOnlyList<BatchDetailDto>>(mapped);
+            }
+        }
+        catch
+        {
+        }
+
         return Task.FromResult(demoDataService.GetBatches());
     }
 
@@ -46,5 +75,15 @@ public sealed class DemoProductionRepository(
     public Task<OperatorEntryDto> CreateOperatorEntryAsync(CreateOperatorEntryRequest request, long userId, string operatorName, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(operatorEntryStore.Add(request, userId, operatorName));
+    }
+
+    public Task<PhotoAssetDto?> GetOperatorEntryPhotoAsync(string entryId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(operatorEntryStore.GetPhoto(entryId));
+    }
+
+    public Task<PhotoAssetDto?> GetWastePhotoAsync(long wasteEntryId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(wasteStore.GetPhoto(wasteEntryId));
     }
 }

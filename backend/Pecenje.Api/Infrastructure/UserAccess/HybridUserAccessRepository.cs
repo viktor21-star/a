@@ -27,28 +27,10 @@ public sealed class HybridUserAccessRepository(
     }
 
     public async Task<UserSummaryDto> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await sqliteRepository.CreateUserAsync(request, cancellationToken);
-        }
-        catch
-        {
-            return await demoRepository.CreateUserAsync(request, cancellationToken);
-        }
-    }
+        => await sqliteRepository.CreateUserAsync(request, cancellationToken);
 
     public async Task<UserSummaryDto> UpdateUserAccountAsync(long userId, UpdateUserAccountRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await sqliteRepository.UpdateUserAccountAsync(userId, request, cancellationToken);
-        }
-        catch
-        {
-            return await demoRepository.UpdateUserAccountAsync(userId, request, cancellationToken);
-        }
-    }
+        => await sqliteRepository.UpdateUserAccountAsync(userId, request, cancellationToken);
 
     public async Task<IReadOnlyList<UserLocationPermissionDto>> GetUserLocationsAsync(long userId, CancellationToken cancellationToken = default)
     {
@@ -68,16 +50,7 @@ public sealed class HybridUserAccessRepository(
     }
 
     public async Task<IReadOnlyList<UserLocationPermissionDto>> UpdateUserLocationsAsync(long userId, UpdateUserLocationsRequest request, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await sqliteRepository.UpdateUserLocationsAsync(userId, request, cancellationToken);
-        }
-        catch
-        {
-            return await demoRepository.UpdateUserLocationsAsync(userId, request, cancellationToken);
-        }
-    }
+        => await sqliteRepository.UpdateUserLocationsAsync(userId, request, cancellationToken);
 
     public async Task<UserAuthenticationResultDto?> AuthenticateAsync(string username, string password, CancellationToken cancellationToken = default)
     {

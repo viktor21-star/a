@@ -24,9 +24,9 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
 
     private static readonly List<UserSummaryDto> Users =
     [
-        new UserSummaryDto(1, "admin", "Администратор", "administrator", true),
-        new UserSummaryDto(2, "pekara.aer1", "Пекар Аеродром 1", "operator", true),
-        new UserSummaryDto(3, "sef.centar", "Шеф Центар", "market_manager", true)
+        new UserSummaryDto(1, "admin", "Администратор", "administrator", true, 1),
+        new UserSummaryDto(2, "pekara.aer1", "Пекар Аеродром 1", "operator", true, 1),
+        new UserSummaryDto(3, "sef.centar", "Шеф Центар", "market_manager", true, 2)
     ];
 
     private static readonly Dictionary<string, DemoUserCredential> CredentialsByUsername = new(StringComparer.OrdinalIgnoreCase)
@@ -69,7 +69,7 @@ public sealed class DemoUserAccessRepository : IUserAccessRepository
     public Task<UserSummaryDto> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
     {
         var nextId = Users.Count == 0 ? 1 : Users.Max((user) => user.UserId) + 1;
-        var user = new UserSummaryDto(nextId, request.Username, request.FullName, request.RoleCode, request.IsActive);
+        var user = new UserSummaryDto(nextId, request.Username, request.FullName, request.RoleCode, request.IsActive, request.DefaultLocationId);
 
         Users.Add(user);
         CredentialsByUsername[request.Username] = new DemoUserCredential(

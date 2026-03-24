@@ -15,5 +15,8 @@ echo "Installed user services:"
 echo "  pecenje-backend.service"
 echo "  pecenje-tunnel.service"
 echo
+echo "Environment:"
+echo "  ASPNETCORE_ENVIRONMENT=Production"
+echo
 echo "Start them with:"
 echo "  systemctl --user start pecenje-backend.service pecenje-tunnel.service"

@@ -1,0 +1,16 @@
+<svg width="320" height="180" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="180" fill="#F7FAF8"/>
+  <path d="M22 46C22 37.1634 29.1634 30 38 30H293C302.941 30 310.476 38.9943 308.73 48.7811L294.804 126.781C293.438 134.431 286.783 140 279.012 140H38C29.1634 140 22 132.837 22 124V46Z" fill="#1FC25E"/>
+  <path d="M45 54H75L95 84L75 114H45L65 84L45 54Z" fill="white"/>
+  <path d="M121 54H151L112 114H82L121 54Z" fill="white"/>
+  <path d="M104 57C106.5 64 106 72 103 79" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M110 50C113.5 61 113 73 108 85" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M116 44C120.5 59 120 76 114 92" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M104 95C105.5 104 108.5 112 113 118" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <path d="M159 55C161.223 47.8699 167.816 43 175.285 43H183L172 118H154L159 55Z" fill="white"/>
+  <path d="M186 43H257L254 60H227L217 118H198L208 60H183L186 43Z" fill="white"/>
+  <path d="M266 43H284C298.359 43 309 52.7702 309 67.5C309 96.546 290.398 118 263.5 118H238L266 43ZM257 60L238 101H258.5C273.387 101 287 87.5766 287 70.5C287 63.9029 282.739 60 274.5 60H257Z" fill="white"/>
+  <path d="M171 131C188.833 131 206.667 131 224.5 131C234.588 131 244.676 131 254.764 131" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <text x="188" y="88" fill="white" font-family="Manrope, Arial, sans-serif" font-size="46" font-weight="800" font-style="italic">ито</text>
+  <text x="191" y="117" fill="white" font-family="Manrope, Arial, sans-serif" font-size="30" font-weight="700" font-style="italic">маркети</text>
+</svg>

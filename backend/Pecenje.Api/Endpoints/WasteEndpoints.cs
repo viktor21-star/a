@@ -13,6 +13,14 @@ public static class WasteEndpoints
         group.MapGet("/", async (ProductionAppService appService, CancellationToken cancellationToken) => Results.Ok(
             new ApiEnvelope<IReadOnlyList<WasteSummaryDto>>(await appService.GetWasteAsync(cancellationToken))));
 
+        group.MapGet("/{wasteEntryId:long}/photo", async (long wasteEntryId, ProductionAppService appService, CancellationToken cancellationToken) =>
+        {
+            var photo = await appService.GetWastePhotoAsync(wasteEntryId, cancellationToken);
+            return photo is null
+                ? Results.NotFound()
+                : Results.Ok(new ApiEnvelope<Pecenje.Api.Contracts.Common.PhotoAssetDto>(photo));
+        });
+
         group.MapPost("/", async (CreateWasteEntryRequest request, ProductionAppService appService, CancellationToken cancellationToken) =>
         {
             var created = await appService.CreateWasteAsync(request, cancellationToken);

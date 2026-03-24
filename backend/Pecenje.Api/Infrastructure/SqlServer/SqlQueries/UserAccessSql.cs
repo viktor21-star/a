@@ -8,7 +8,8 @@ public static class UserAccessSql
             u.Username,
             u.FullName,
             r.Code AS RoleCode,
-            u.IsActive
+            u.IsActive,
+            u.DefaultLocationId
         FROM dbo.Users u
         INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
         ORDER BY u.FullName;
@@ -47,7 +48,8 @@ public static class UserAccessSql
             u.Username,
             u.FullName,
             r.Code AS RoleCode,
-            u.IsActive
+            u.IsActive,
+            u.DefaultLocationId
         FROM dbo.Users u
         INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
         WHERE u.UserId = CAST(SCOPE_IDENTITY() AS BIGINT);
@@ -68,7 +70,8 @@ public static class UserAccessSql
             u.Username,
             u.FullName,
             r.Code AS RoleCode,
-            u.IsActive
+            u.IsActive,
+            u.DefaultLocationId
         FROM dbo.Users u
         INNER JOIN dbo.Roles r ON r.RoleId = u.RoleId
         WHERE u.UserId = @UserId;

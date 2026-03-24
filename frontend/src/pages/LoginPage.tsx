@@ -13,7 +13,7 @@ export function LoginPage() {
   return (
     <section className="login-page">
       <article className="login-card">
-        <p className="topbar-eyebrow">Enterprise Access</p>
+        <img className="app-logo app-logo--login" src="/zito-logo.png" alt="Жито маркети" />
         <h2>Најава во системот</h2>
         <p>Внеси корисничко име и лозинка за да пристапиш во системот.</p>
 
@@ -52,13 +52,6 @@ export function LoginPage() {
           >
             {submitting ? "Најава..." : "Најави се"}
           </button>
-        </div>
-
-        <div className="sync-result">
-          <strong>Почетни корисници</strong>
-          <span>`admin / 1234`</span>
-          <span>`operator / 1111`</span>
-          <span>`manager / 2222`</span>
         </div>
       </article>
     </section>

@@ -8,5 +8,6 @@ public sealed record SourceItemDto(
     string GroupName,
     decimal SalesPrice,
     bool IsActive,
-    string? AllowedLocationCode
+    string? AllowedLocationCode,
+    string? AllowedFlag
 );

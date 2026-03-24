@@ -28,6 +28,10 @@ public sealed class LocalAppDb
     {
         using var connection = CreateConnection();
         connection.Open();
+        connection.Execute("PRAGMA journal_mode=WAL;");
+        connection.Execute("PRAGMA synchronous=NORMAL;");
+        connection.Execute("PRAGMA temp_store=MEMORY;");
+        connection.Execute("PRAGMA foreign_keys=ON;");
         connection.Execute(
             """
             CREATE TABLE IF NOT EXISTS ManualPlans (
@@ -117,6 +121,19 @@ public sealed class LocalAppDb
                 IsActive INTEGER NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS LocalLocations (
+                LocationId INTEGER PRIMARY KEY,
+                Code TEXT NOT NULL,
+                NameMk TEXT NOT NULL,
+                RegionCode TEXT NOT NULL,
+                IsActive INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS LocalLocationStatuses (
+                Code TEXT PRIMARY KEY,
+                IsActive INTEGER NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS LocalUserLocations (
                 UserId INTEGER NOT NULL,
                 LocationId INTEGER NOT NULL,
@@ -133,6 +150,21 @@ public sealed class LocalAppDb
                 PecenjaraOvenType TEXT NULL,
                 PRIMARY KEY (UserId, LocationId)
             );
+
+            CREATE INDEX IF NOT EXISTS IX_ManualPlans_Mode_Location_PlanDate_Status
+            ON ManualPlans (Mode, LocationId, PlanDate, Status);
+
+            CREATE INDEX IF NOT EXISTS IX_OperatorEntries_Mode_Location_CreatedAt
+            ON OperatorEntries (Mode, LocationId, CreatedAt DESC);
+
+            CREATE INDEX IF NOT EXISTS IX_OperatorEntryItems_EntryId
+            ON OperatorEntryItems (EntryId);
+
+            CREATE INDEX IF NOT EXISTS IX_WasteEntries_SourceMode_Location_CreatedAt
+            ON WasteEntries (SourceMode, LocationId, CreatedAt DESC);
+
+            CREATE INDEX IF NOT EXISTS IX_LocalUserLocations_UserId_LocationId
+            ON LocalUserLocations (UserId, LocationId);
             """);
 
         EnsureColumn(connection, "LocalUsers", "DefaultLocationId", "INTEGER NULL");
@@ -148,6 +180,8 @@ public sealed class LocalAppDb
         EnsureColumn(connection, "WasteEntries", "PhotoName", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "WasteEntries", "CreatedAt", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "WasteEntries", "OperatorName", "TEXT NOT NULL DEFAULT ''");
+        NormalizeLocalLocations(connection);
+        SeedLocationStatuses(connection);
     }
 
     private static void EnsureColumn(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
@@ -171,5 +205,72 @@ public sealed class LocalAppDb
         }
 
         connection.Execute($"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}");
+    }
+
+    private static void NormalizeLocalLocations(SqliteConnection connection)
+    {
+        var rows = connection.Query<LocationCleanupRow>(
+            """
+            SELECT LocationId, Code, NameMk, RegionCode, IsActive
+            FROM LocalLocations
+            ORDER BY LocationId
+            """).ToList();
+
+        if (rows.Count <= 1)
+        {
+            return;
+        }
+
+        var deduped = rows
+            .GroupBy(row => (row.Code ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(row => row.IsActive)
+                .ThenByDescending(row => row.LocationId)
+                .First())
+            .ToList();
+
+        if (deduped.Count == rows.Count)
+        {
+            return;
+        }
+
+        using var transaction = connection.BeginTransaction();
+        connection.Execute("DELETE FROM LocalLocations", transaction: transaction);
+        connection.Execute(
+            """
+            INSERT INTO LocalLocations (LocationId, Code, NameMk, RegionCode, IsActive)
+            VALUES (@LocationId, @Code, @NameMk, @RegionCode, @IsActive)
+            """,
+            deduped.Select(row => new
+            {
+                row.LocationId,
+                row.Code,
+                row.NameMk,
+                row.RegionCode,
+                IsActive = row.IsActive ? 1 : 0
+            }),
+            transaction: transaction);
+        transaction.Commit();
+    }
+
+    private static void SeedLocationStatuses(SqliteConnection connection)
+    {
+        connection.Execute(
+            """
+            INSERT OR IGNORE INTO LocalLocationStatuses (Code, IsActive)
+            SELECT trim(Code), MAX(IsActive)
+            FROM LocalLocations
+            WHERE trim(Code) <> ''
+            GROUP BY trim(Code)
+            """);
+    }
+
+    private sealed class LocationCleanupRow
+    {
+        public int LocationId { get; init; }
+        public string Code { get; init; } = string.Empty;
+        public string NameMk { get; init; } = string.Empty;
+        public string RegionCode { get; init; } = string.Empty;
+        public bool IsActive { get; init; }
     }
 }

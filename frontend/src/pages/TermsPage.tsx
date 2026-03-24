@@ -11,6 +11,8 @@ export function TermsPage() {
   const [search, setSearch] = useState("");
   const [terms, setTerms] = useState<TermEntry[]>([]);
   const [draft, setDraft] = useState({ label: "", time: "" });
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setTerms(termsQuery.data?.data ?? []);
@@ -41,7 +43,7 @@ export function TermsPage() {
     <section className="page-grid">
       <header className="page-header">
         <div>
-          <p className="topbar-eyebrow">Шифарници</p>
+          <p className="topbar-eyebrow">Шифрарници</p>
           <h3>Термини</h3>
           <p className="meta">Тука се одржуваат часовите кога печењето треба да биде готово.</p>
         </div>
@@ -54,7 +56,11 @@ export function TermsPage() {
             className="action-button"
             type="button"
             onClick={() => {
+              setSaveMessage(null);
+              setSaveError(null);
+
               if (!draft.label || !draft.time) {
+                setSaveError("Внеси назив и време за термин.");
                 return;
               }
 
@@ -68,13 +74,26 @@ export function TermsPage() {
                 }
               ];
               setTerms(next);
-              updateTerms.mutate({ terms: next });
-              setDraft({ label: "", time: "" });
+              updateTerms.mutate(
+                { terms: next },
+                {
+                  onSuccess: () => {
+                    setDraft({ label: "", time: "" });
+                    setSearch("");
+                    setSaveMessage(`Успешно е додаден термин: ${draft.label}.`);
+                  },
+                  onError: (error) => {
+                    setSaveError(error instanceof Error ? error.message : "Термините не може да се снимат.");
+                  }
+                }
+              );
             }}
           >
             Додади термин
           </button>
         </div>
+        {saveMessage && <div className="sync-result">{saveMessage}</div>}
+        {saveError && <div className="form-error">{saveError}</div>}
 
         <div className="admin-form-grid">
           <article className="admin-input-tile">
@@ -97,8 +116,6 @@ export function TermsPage() {
           <h3>Листа на термини</h3>
           <span>{filteredTerms.length} термини</span>
         </div>
-        {updateTerms.isSuccess ? <p className="meta">Термините се успешно снимени.</p> : null}
-        {updateTerms.isError ? <p className="meta">Не може да се снимат термините. Провери дали серверот работи.</p> : null}
         <div className="card-list admin-summary-grid">
           {filteredTerms.map((term) => (
             <article className="workflow-card admin-tile-card" key={term.id}>
@@ -112,11 +129,23 @@ export function TermsPage() {
                   className="ghost-button"
                   type="button"
                   onClick={() => {
+                    setSaveMessage(null);
+                    setSaveError(null);
                     const next = terms.map((entry) =>
                       entry.id === term.id ? { ...entry, isActive: !entry.isActive } : entry
                     );
                     setTerms(next);
-                    updateTerms.mutate({ terms: next });
+                    updateTerms.mutate(
+                      { terms: next },
+                      {
+                        onSuccess: () => {
+                          setSaveMessage(`Успешно е ${term.isActive ? "деактивиран" : "активиран"} термин: ${term.label}.`);
+                        },
+                        onError: (error) => {
+                          setSaveError(error instanceof Error ? error.message : "Термините не може да се снимат.");
+                        }
+                      }
+                    );
                   }}
                 >
                   {term.isActive ? "Деактивирај" : "Активирај"}
@@ -125,9 +154,21 @@ export function TermsPage() {
                   className="action-button"
                   type="button"
                   onClick={() => {
+                    setSaveMessage(null);
+                    setSaveError(null);
                     const next = terms.filter((entry) => entry.id !== term.id);
                     setTerms(next);
-                    updateTerms.mutate({ terms: next });
+                    updateTerms.mutate(
+                      { terms: next },
+                      {
+                        onSuccess: () => {
+                          setSaveMessage(`Успешно е избришан термин: ${term.label}.`);
+                        },
+                        onError: (error) => {
+                          setSaveError(error instanceof Error ? error.message : "Термините не може да се снимат.");
+                        }
+                      }
+                    );
                   }}
                 >
                   Избриши

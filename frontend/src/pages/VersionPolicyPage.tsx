@@ -9,6 +9,8 @@ export function VersionPolicyPage() {
   const policyQuery = useVersionPolicy();
   const updateMutation = useUpdateVersionPolicy();
   const [form, setForm] = useState<UpdateAppVersionPolicyRequest | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (policyQuery.data?.data) {
@@ -44,11 +46,26 @@ export function VersionPolicyPage() {
             className="action-button"
             type="button"
             disabled={updateMutation.isPending}
-            onClick={() => updateMutation.mutate(form)}
+            onClick={() => {
+              setSaveMessage(null);
+              setSaveError(null);
+
+              updateMutation.mutate(form, {
+                onSuccess: () => {
+                  setSaveMessage("Успешно е снимeна политиката за верзија.");
+                },
+                onError: (error) => {
+                  setSaveError(error instanceof Error ? error.message : "Политиката за верзија не може да се сними.");
+                }
+              });
+            }}
           >
             {updateMutation.isPending ? "Снима..." : "Сними политика"}
           </button>
         </div>
+
+        {saveMessage && <div className="sync-result">{saveMessage}</div>}
+        {saveError && <div className="form-error">{saveError}</div>}
 
         <div className="master-form master-form--inline">
           <input
@@ -90,10 +107,6 @@ export function VersionPolicyPage() {
             Задолжителен update
           </label>
         </div>
-
-        {(updateMutation.error as Error | null) && (
-          <div className="form-error">{(updateMutation.error as Error).message}</div>
-        )}
 
         <div className="sync-result">
           <strong>Тековна активна политика</strong>

@@ -6,22 +6,31 @@ namespace Pecenje.Api.Application.Services;
 
 public sealed class ReportingAppService(IAnalyticsRepository analyticsRepository)
 {
-    public Task<PlanVsActualReportDto> GetPlanVsActualAsync(CancellationToken cancellationToken = default)
-        => analyticsRepository.GetPlanVsActualAsync(cancellationToken);
+    public async Task<PlanVsActualReportDto> GetPlanVsActualAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await analyticsRepository.GetPlanVsActualAsync(cancellationToken);
+        }
+        catch
+        {
+            return new PlanVsActualReportDto([], new ReportTotalsDto(0, 0, 0, 0));
+        }
+    }
 
     public async Task<ReportExportDto> ExportPlanVsActualExcelAsync(CancellationToken cancellationToken = default)
     {
-        var report = await analyticsRepository.GetPlanVsActualAsync(cancellationToken);
+        var report = await GetPlanVsActualAsync(cancellationToken);
         var builder = new StringBuilder();
 
-        builder.AppendLine("Локација,Артикал,Планирано,Испечено,Разлика,% Реализација");
+        builder.AppendLine("Локација,Артикал,Модул,Датум,Планирано време,Реално време,Доцнење (мин),Статус,Планирано,Испечено,Разлика,% Реализација");
 
         foreach (var row in report.Rows)
         {
-            builder.AppendLine($"{Escape(row.LocationName)},{Escape(row.ItemName)},{row.PlannedQty},{row.BakedQty},{row.DifferenceQty},{row.RealizationPct}");
+            builder.AppendLine($"{Escape(row.LocationName)},{Escape(row.ItemName)},{Escape(row.Mode)},{Escape(row.PlanDate)},{Escape(row.PlannedTime)},{Escape(row.ActualTime ?? "-")},{row.DelayMinutes?.ToString() ?? "-"},{Escape(row.TimingStatus)},{row.PlannedQty},{row.BakedQty},{row.DifferenceQty},{row.RealizationPct}");
         }
 
-        builder.AppendLine($"{Escape("Вкупно")},,{report.Totals.PlannedQty},{report.Totals.BakedQty},{report.Totals.DifferenceQty},{report.Totals.RealizationPct}");
+        builder.AppendLine($"{Escape("Вкупно")},,,,,,,,{report.Totals.PlannedQty},{report.Totals.BakedQty},{report.Totals.DifferenceQty},{report.Totals.RealizationPct}");
 
         return new ReportExportDto(
             "plan-vs-actual.csv",
@@ -32,7 +41,7 @@ public sealed class ReportingAppService(IAnalyticsRepository analyticsRepository
 
     public async Task<ReportExportDto> ExportPlanVsActualPdfAsync(CancellationToken cancellationToken = default)
     {
-        var report = await analyticsRepository.GetPlanVsActualAsync(cancellationToken);
+        var report = await GetPlanVsActualAsync(cancellationToken);
         var builder = new StringBuilder();
 
         builder.Append("""
@@ -56,6 +65,12 @@ public sealed class ReportingAppService(IAnalyticsRepository analyticsRepository
                   <tr>
                     <th>Локација</th>
                     <th>Артикал</th>
+                    <th>Модул</th>
+                    <th>Датум</th>
+                    <th>Планирано време</th>
+                    <th>Реално време</th>
+                    <th>Доцнење (мин)</th>
+                    <th>Статус</th>
                     <th>Планирано</th>
                     <th>Испечено</th>
                     <th>Разлика</th>
@@ -71,6 +86,12 @@ public sealed class ReportingAppService(IAnalyticsRepository analyticsRepository
                 <tr>
                   <td>{System.Net.WebUtility.HtmlEncode(row.LocationName)}</td>
                   <td>{System.Net.WebUtility.HtmlEncode(row.ItemName)}</td>
+                  <td>{System.Net.WebUtility.HtmlEncode(row.Mode)}</td>
+                  <td>{System.Net.WebUtility.HtmlEncode(row.PlanDate)}</td>
+                  <td>{System.Net.WebUtility.HtmlEncode(row.PlannedTime)}</td>
+                  <td>{System.Net.WebUtility.HtmlEncode(row.ActualTime ?? "-")}</td>
+                  <td>{row.DelayMinutes?.ToString() ?? "-"}</td>
+                  <td>{System.Net.WebUtility.HtmlEncode(row.TimingStatus)}</td>
                   <td>{row.PlannedQty}</td>
                   <td>{row.BakedQty}</td>
                   <td>{row.DifferenceQty}</td>
@@ -83,7 +104,7 @@ public sealed class ReportingAppService(IAnalyticsRepository analyticsRepository
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colspan="2">Вкупно</td>
+                    <td colspan="8">Вкупно</td>
                     <td>{report.Totals.PlannedQty}</td>
                     <td>{report.Totals.BakedQty}</td>
                     <td>{report.Totals.DifferenceQty}</td>
