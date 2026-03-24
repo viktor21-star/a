@@ -378,7 +378,7 @@ export function ReportsPage() {
           id: "pijara",
           title: "Пријави од Пијара",
           description: "Преглед на сите пријавени артикли од Пијара, со вкупна количина и Класа Б.",
-          columns: ["Датум", "Локација", "Артикал", "Количина", "Класа Б", "Време"],
+          columns: ["Датум", "Локација", "Артикал", "Вкупна количина", "Класа Б количина", "Време"],
           rows: pijaraRows,
           fileName: "pijara-prijavi"
         },
@@ -422,6 +422,21 @@ export function ReportsPage() {
 
     return { baked, planned, waste, rows };
   }, [filteredOperatorEntries, filteredPlanRows, filteredWasteEntries, reports, selectedSection]);
+
+  const pijaraSummary = useMemo(() => {
+    const rows = filteredOperatorEntries.filter((entry) => entry.mode === "pijara");
+    return {
+      reportedQty: rows.reduce(
+        (sum, entry) => sum + entry.items.reduce((entrySum, item) => entrySum + Number(item.quantity ?? 0), 0),
+        0
+      ),
+      classBQty: rows.reduce(
+        (sum, entry) => sum + entry.items.reduce((entrySum, item) => entrySum + Number(item.classB ? item.classBQuantity ?? 0 : 0), 0),
+        0
+      ),
+      reportedItems: rows.reduce((sum, entry) => sum + entry.items.length, 0)
+    };
+  }, [filteredOperatorEntries]);
 
   const filterSummary = useMemo(() => {
     const locationLabel = selectedLocation === "all" ? "Сите локации" : selectedLocation;
@@ -535,22 +550,45 @@ export function ReportsPage() {
       </section>
 
       <section className="admin-hero-grid">
-        <article className="admin-stat-tile">
-          <span>{selectedSection === "pijara" ? "Вкупно пријавено" : "Вкупно испечено"}</span>
-          <strong>{totals.baked}</strong>
-        </article>
-        <article className="admin-stat-tile">
-          <span>Вкупно планирано</span>
-          <strong>{totals.planned}</strong>
-        </article>
-        <article className="admin-stat-tile">
-          <span>Вкупен отпад</span>
-          <strong>{totals.waste}</strong>
-        </article>
-        <article className="admin-stat-tile">
-          <span>Прикажани редови</span>
-          <strong>{totals.rows}</strong>
-        </article>
+        {selectedSection === "pijara" ? (
+          <>
+            <article className="admin-stat-tile">
+              <span>Вкупно пријавено</span>
+              <strong>{pijaraSummary.reportedQty}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Вкупно Класа Б</span>
+              <strong>{pijaraSummary.classBQty}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Пријавени артикли</span>
+              <strong>{pijaraSummary.reportedItems}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Прикажани редови</span>
+              <strong>{totals.rows}</strong>
+            </article>
+          </>
+        ) : (
+          <>
+            <article className="admin-stat-tile">
+              <span>Вкупно испечено</span>
+              <strong>{totals.baked}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Вкупно планирано</span>
+              <strong>{totals.planned}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Вкупен отпад</span>
+              <strong>{totals.waste}</strong>
+            </article>
+            <article className="admin-stat-tile">
+              <span>Прикажани редови</span>
+              <strong>{totals.rows}</strong>
+            </article>
+          </>
+        )}
       </section>
 
       {preview && (

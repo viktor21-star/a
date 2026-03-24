@@ -21,7 +21,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
 
         var items = connection.Query<OperatorEntryItemRow>(
             """
-            SELECT EntryId, ItemIndex, ItemName, Quantity, ClassB, ClassBQuantity
+            SELECT EntryId, ItemIndex, ItemName, Quantity, ClassB, ClassBItemName, ClassBQuantity
             FROM OperatorEntryItems
             ORDER BY EntryId, ItemIndex
             """).ToArray();
@@ -33,7 +33,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
             entry.LocationName,
             items.Where(item => item.EntryId == entry.Id)
                 .OrderBy(item => item.ItemIndex)
-                .Select(item => new OperatorEntryLineDto(item.ItemName, item.Quantity, item.ClassB, item.ClassBQuantity))
+                .Select(item => new OperatorEntryLineDto(item.ItemName, item.Quantity, item.ClassB, item.ClassBItemName, item.ClassBQuantity))
                 .ToArray(),
             entry.Note,
             string.Empty,
@@ -80,9 +80,9 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
             connection.Execute(
                 """
                 INSERT INTO OperatorEntryItems (
-                    EntryId, ItemIndex, ItemName, Quantity, ClassB, ClassBQuantity
+                    EntryId, ItemIndex, ItemName, Quantity, ClassB, ClassBItemName, ClassBQuantity
                 ) VALUES (
-                    @EntryId, @ItemIndex, @ItemName, @Quantity, @ClassB, @ClassBQuantity
+                    @EntryId, @ItemIndex, @ItemName, @Quantity, @ClassB, @ClassBItemName, @ClassBQuantity
                 )
                 """,
                 new
@@ -92,6 +92,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
                     item.ItemName,
                     item.Quantity,
                     ClassB = item.ClassB ? 1 : 0,
+                    item.ClassBItemName,
                     item.ClassBQuantity
                 },
                 transaction);
@@ -144,6 +145,7 @@ public sealed class InMemoryOperatorEntryStore(LocalAppDb localAppDb)
         public string ItemName { get; init; } = string.Empty;
         public decimal Quantity { get; init; }
         public bool ClassB { get; init; }
+        public string? ClassBItemName { get; init; }
         public decimal ClassBQuantity { get; init; }
     }
 }

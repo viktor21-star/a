@@ -4,6 +4,7 @@ public sealed record OperatorEntryLineDto(
     string ItemName,
     decimal Quantity,
     bool ClassB,
+    string? ClassBItemName,
     decimal ClassBQuantity
 );
 

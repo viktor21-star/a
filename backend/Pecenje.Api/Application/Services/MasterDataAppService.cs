@@ -113,7 +113,9 @@ public sealed class MasterDataAppService(
                 NormalizeGroupName(group.Key.GroupCode, group.Key.GroupName),
                 group.Key.SalesPrice,
                 5,
-                group.Key.IsActive))
+                group.Key.IsActive,
+                group.Select(row => NormalizeDisplayText(row.ClassBCode)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)),
+                group.Select(row => NormalizeDisplayText(row.ClassBName)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))))
             .ToArray();
 
         return groupedRows;

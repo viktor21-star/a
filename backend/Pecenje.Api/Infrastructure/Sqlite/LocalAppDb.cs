@@ -67,6 +67,7 @@ public sealed class LocalAppDb
                 ItemName TEXT NOT NULL,
                 Quantity REAL NOT NULL,
                 ClassB INTEGER NOT NULL,
+                ClassBItemName TEXT NULL,
                 ClassBQuantity REAL NOT NULL,
                 PRIMARY KEY (EntryId, ItemIndex)
             );
@@ -180,6 +181,7 @@ public sealed class LocalAppDb
         EnsureColumn(connection, "WasteEntries", "PhotoName", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "WasteEntries", "CreatedAt", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn(connection, "WasteEntries", "OperatorName", "TEXT NOT NULL DEFAULT ''");
+        EnsureColumn(connection, "OperatorEntryItems", "ClassBItemName", "TEXT NULL");
         NormalizeLocalLocations(connection);
         SeedLocationStatuses(connection);
     }

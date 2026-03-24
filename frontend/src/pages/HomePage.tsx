@@ -16,6 +16,12 @@ const adminModules = [
     imageClass: "home-card--production"
   },
   {
+    title: "Пријави од Пијара",
+    description: "Посебен преглед на пријавени артикли од Пијара и Класа Б.",
+    path: "/production?adminMode=pijara",
+    imageClass: "home-card--pijara"
+  },
+  {
     title: "Аларми",
     description: "Разлика меѓу план и реално печење со критични отстапувања.",
     path: "/alerts",

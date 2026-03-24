@@ -1043,6 +1043,18 @@ button {
   background: var(--surface);
 }
 
+.operator-line-row--pijara {
+  grid-template-columns: minmax(240px, 1.6fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.operator-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .operator-item-toggle {
   display: flex;
   align-items: center;

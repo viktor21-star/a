@@ -92,6 +92,8 @@ public static class SourceSyncSql
                   END + N' AS GroupName,
                 CAST(0 AS decimal(18,2)) AS SalesPrice,
                 CAST(1 AS bit) AS IsActive,
+                CAST(cb.ClassBCode AS nvarchar(50)) AS ClassBCode,
+                CAST(cb.ClassBName AS nvarchar(200)) AS ClassBName,
                 ' + CASE
                     WHEN @optItemColumn IS NOT NULL AND @optLocationColumn IS NOT NULL
                       THEN N'CAST(o.' + QUOTENAME(@optLocationColumn) + N' AS nvarchar(50))'
@@ -113,6 +115,15 @@ public static class SourceSyncSql
                 THEN N'LEFT JOIN dbo.optzalpooe o ON CAST(k.Sifra_Art AS nvarchar(50)) = CAST(o.' + QUOTENAME(@optItemColumn) + N' AS nvarchar(50)) '
               ELSE N''
             END +
+            N'OUTER APPLY (
+                SELECT TOP (1)
+                    CAST(s.Sifra_Art AS nvarchar(50)) AS ClassBCode,
+                    CAST(kb.ImeArt AS nvarchar(200)) AS ClassBName
+                FROM dbo.sostav s
+                LEFT JOIN dbo.katart kb ON CAST(kb.Sifra_Art AS nvarchar(50)) = CAST(s.Sifra_Art AS nvarchar(50))
+                WHERE CAST(s.Sifra_Sur AS nvarchar(50)) = CAST(k.Sifra_Art AS nvarchar(50))
+                ORDER BY CAST(s.Sifra_Art AS nvarchar(50))
+            ) cb ' +
             N'WHERE ' + CASE
               WHEN @subgroupColumn IS NOT NULL AND @podgrupiSubgroupColumn IS NOT NULL AND @podgrupiGroupColumn IS NOT NULL
                 THEN N'CAST(p.' + QUOTENAME(@podgrupiGroupColumn) + N' AS nvarchar(50))'

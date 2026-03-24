@@ -65,6 +65,7 @@ export type OperatorEntryLine = {
   itemName: string;
   quantity: number;
   classB: boolean;
+  classBItemName?: string;
   classBQuantity: number;
 };
 
@@ -233,6 +234,8 @@ export type Item = {
   salesPrice: number;
   wasteLimitPct: number;
   isActive: boolean;
+  classBCode?: string | null;
+  classBName?: string | null;
 };
 
 export type UpsertLocationRequest = {

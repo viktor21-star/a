@@ -8,5 +8,7 @@ public sealed record ItemDto(
     string GroupName,
     decimal SalesPrice,
     decimal WasteLimitPct,
-    bool IsActive
+    bool IsActive,
+    string? ClassBCode,
+    string? ClassBName
 );

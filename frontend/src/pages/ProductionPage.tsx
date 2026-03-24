@@ -10,6 +10,17 @@ import type { CreateOperatorEntryRequest, CreateWasteEntryRequest, Item, Operato
 type ItemMode = "pekara" | "pecenjara" | "pijara";
 type EntryMode = ItemMode | "waste";
 
+function formatClassBLabel(code?: string | null, name?: string | null) {
+  const normalizedCode = (code ?? "").trim();
+  const normalizedName = (name ?? "").trim();
+
+  if (normalizedCode && normalizedName) {
+    return `${normalizedCode} · ${normalizedName}`;
+  }
+
+  return normalizedCode || normalizedName || "";
+}
+
 export function ProductionPage() {
   const { user } = useAuth();
   const operatorEntriesQuery = useOperatorEntries();
@@ -35,6 +46,10 @@ export function ProductionPage() {
   const [wasteReason, setWasteReason] = useState("");
   const [saveConfirmation, setSaveConfirmation] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const adminQueryMode = useMemo(() => {
+    const mode = new URLSearchParams(window.location.search).get("adminMode");
+    return mode === "pijara" ? "pijara" : null;
+  }, []);
   const photoReady = Boolean(draft.photoDataUrl);
   const itemReady = draftItems.length > 0;
   const quantityReady = draftItems.every(
@@ -43,7 +58,10 @@ export function ProductionPage() {
       (entry.quantity > 0 && (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0))
   );
   const readyItems = draftItems.filter(
-    (entry) => entry.itemName && entry.quantity > 0 && (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0)
+    (entry) =>
+      entry.itemName &&
+      entry.quantity > 0 &&
+      (selectedMode !== "pijara" || !entry.classB || entry.classBQuantity > 0)
   );
   const effectiveItemMode = selectedMode === "waste" ? wasteSource : selectedMode;
   const availableItems = useMemo(() => filterItemsForMode(itemsQuery.data?.data ?? [], effectiveItemMode), [itemsQuery.data, effectiveItemMode]);
@@ -271,6 +289,7 @@ export function ProductionPage() {
         .filter((entry) => entry.mode === selectedMode && entry.locationId === activeLocation?.locationId)
         .sort((left, right) => left.termLabel.localeCompare(right.termLabel))
     : [];
+  const adminDisplayMode = adminQueryMode ?? adminMode;
 
   if (!isAdministrator(user)) {
     return (
@@ -487,6 +506,10 @@ export function ProductionPage() {
                                           itemName: item.nameMk,
                                           quantity: 1,
                                           classB: selectedMode === "pijara",
+                                          classBItemName:
+                                            selectedMode === "pijara" && (item.classBCode || item.classBName)
+                                              ? formatClassBLabel(item.classBCode, item.classBName)
+                                              : "",
                                           classBQuantity: selectedMode === "pijara" ? 1 : 0
                                         }
                                       ];
@@ -512,7 +535,10 @@ export function ProductionPage() {
                       <strong>Избрани артикли · {draftItems.length}</strong>
                       <div className="operator-lines-grid">
                         {draftItems.map((entry) => (
-                          <div className="operator-line-row operator-line-row--checkbox" key={`selected-${entry.itemName}`}>
+                          <div
+                            className={`operator-line-row operator-line-row--checkbox${selectedMode === "pijara" ? " operator-line-row--pijara" : ""}`}
+                            key={`selected-${entry.itemName}`}
+                          >
                             <div className="operator-item-toggle">
                               <span>
                                 <strong>{entry.itemName}</strong>
@@ -521,6 +547,7 @@ export function ProductionPage() {
                                 </small>
                               </span>
                             </div>
+                            {selectedMode === "pijara" ? <div className="operator-field-label">Вкупна количина</div> : null}
                             <input
                               type="number"
                               min="0"
@@ -529,10 +556,17 @@ export function ProductionPage() {
                                 const nextValue = Number(event.target.value);
                                 setDraftItems((current) =>
                                   current.map((line) =>
-                                    line.itemName === entry.itemName ? { ...line, quantity: nextValue } : line
+                                    line.itemName === entry.itemName
+                                          ? {
+                                              ...line,
+                                              quantity: nextValue,
+                                              classBQuantity: line.classB ? Math.min(line.classBQuantity, nextValue) : line.classBQuantity
+                                        }
+                                      : line
                                   )
                                 );
                               }}
+                              aria-label={selectedMode === "pijara" ? "Вкупна количина" : "Количина"}
                               placeholder={selectedMode === "pijara" ? "Вкупна количина" : "Количина"}
                             />
                             {selectedMode === "pijara" ? (
@@ -546,7 +580,19 @@ export function ProductionPage() {
                                       setDraftItems((current) =>
                                         current.map((line) =>
                                           line.itemName === entry.itemName
-                                            ? { ...line, classB: checked, classBQuantity: checked ? Math.max(line.classBQuantity, 1) : 0 }
+                                            ? {
+                                                ...line,
+                                                classB: checked,
+                                                classBItemName:
+                                                  checked
+                                                    ? line.classBItemName ||
+                                                      formatClassBLabel(
+                                                        availableItems.find((item) => item.nameMk === line.itemName)?.classBCode,
+                                                        availableItems.find((item) => item.nameMk === line.itemName)?.classBName
+                                                      )
+                                                    : "",
+                                                classBQuantity: checked ? Math.max(line.classBQuantity, 1) : 0
+                                              }
                                             : line
                                         )
                                       );
@@ -554,6 +600,11 @@ export function ProductionPage() {
                                   />
                                   <span>Класа Б</span>
                                 </label>
+                                <div className="operator-field-label">Од тоа Класа Б</div>
+                                <span className="meta">
+                                  Б-класа артикал:{" "}
+                                  {entry.classBItemName || "Нема поврзан Б-класа артикал во source."}
+                                </span>
                                 <input
                                   type="number"
                                   min="0"
@@ -563,12 +614,23 @@ export function ProductionPage() {
                                     setDraftItems((current) =>
                                       current.map((line) =>
                                         line.itemName === entry.itemName
-                                          ? { ...line, classB: nextValue > 0 || line.classB, classBQuantity: nextValue }
+                                          ? {
+                                              ...line,
+                                              classB: nextValue > 0 || line.classB,
+                                              classBItemName:
+                                                line.classBItemName ||
+                                                formatClassBLabel(
+                                                  availableItems.find((item) => item.nameMk === line.itemName)?.classBCode,
+                                                  availableItems.find((item) => item.nameMk === line.itemName)?.classBName
+                                                ),
+                                              classBQuantity: Math.min(nextValue, line.quantity)
+                                            }
                                           : line
                                       )
                                     );
                                   }}
-                                  placeholder="Количина за Класа Б"
+                                  aria-label="Од тоа Класа Б"
+                                  placeholder="Од тоа Класа Б"
                                   disabled={!entry.classB}
                                 />
                               </>
@@ -597,6 +659,11 @@ export function ProductionPage() {
                           </div>
                         ))}
                       </div>
+                      {selectedMode === "pijara" && (
+                        <div className="list-card">
+                          Вкупна количина е целата количина за пријавениот артикал. Од тоа Класа Б е делот што се ослободува по пријава, а Б-класа артикалот се повлекува автоматски од source.
+                        </div>
+                      )}
                     </div>
                   )}
                 </article>
@@ -941,45 +1008,51 @@ export function ProductionPage() {
       <header className="page-header">
         <div>
           <p className="topbar-eyebrow">Администратор</p>
-          <h3>Преглед на реално печење</h3>
-          <p className="meta">Администраторот ги гледа вистинските операторски внесови, по локација, модул и време.</p>
+          <h3>{adminQueryMode === "pijara" ? "Пријави од Пијара" : "Преглед на реално печење"}</h3>
+          <p className="meta">
+            {adminQueryMode === "pijara"
+              ? "Посебен преглед на пријавени артикли од Пијара, со количина, Класа Б и време."
+              : "Администраторот ги гледа вистинските операторски внесови за Пекара и Печењара, по локација, модул и време."}
+          </p>
         </div>
       </header>
 
-      <section className="operator-mode-grid">
-        <button
-          type="button"
-          className={`operator-mode-card${adminMode === "pekara" ? " operator-mode-card--active" : ""}`}
-          onClick={() => setAdminMode("pekara")}
-        >
-          <strong>Пекара</strong>
-          <span>Преглед на внесови за пекарските производи.</span>
-        </button>
-        <button
-          type="button"
-          className={`operator-mode-card${adminMode === "pecenjara" ? " operator-mode-card--active" : ""}`}
-          onClick={() => setAdminMode("pecenjara")}
-        >
-          <strong>Печењара</strong>
-          <span>Преглед на внесови за печењара.</span>
-        </button>
-      </section>
+      {!adminQueryMode && (
+        <section className="operator-mode-grid">
+          <button
+            type="button"
+            className={`operator-mode-card${adminMode === "pekara" ? " operator-mode-card--active" : ""}`}
+            onClick={() => setAdminMode("pekara")}
+          >
+            <strong>Пекара</strong>
+            <span>Преглед на внесови за пекарските производи.</span>
+          </button>
+          <button
+            type="button"
+            className={`operator-mode-card${adminMode === "pecenjara" ? " operator-mode-card--active" : ""}`}
+            onClick={() => setAdminMode("pecenjara")}
+          >
+            <strong>Печењара</strong>
+            <span>Преглед на внесови за печењара.</span>
+          </button>
+        </section>
+      )}
 
       <div className="operator-explainer">
         <strong>Како се користи овој дел:</strong>
-        <span>1. Одбери дали гледаш Пекара или Печењара.</span>
-        <span>2. Лево се гледаат сите последни операторски внесови за избраниот модул.</span>
-        <span>3. За секој внес се проверува локација, оператор, време и точните артикли.</span>
-        <span>3. Десно се гледа последно пријавениот отпад за брз увид.</span>
-        <span>4. За споредба со планот и анализа продолжи во `Аларми` и `Извештаи`.</span>
+        <span>{adminQueryMode === "pijara" ? "1. Лево се гледаат сите последни пријави од Пијара." : "1. Одбери дали гледаш Пекара или Печењара."}</span>
+        <span>{adminQueryMode === "pijara" ? "2. За секоја пријава се гледаат локација, оператор, време и артикли." : "2. Лево се гледаат сите последни операторски внесови за избраниот модул."}</span>
+        <span>{adminQueryMode === "pijara" ? "3. За Пијара се гледа и Класа Б по артикал." : "3. За секој внес се проверува локација, оператор, време и точните артикли."}</span>
+        <span>{adminQueryMode === "pijara" ? "4. Десно се гледа последно пријавениот отпад за брз увид." : "4. Десно се гледа последно пријавениот отпад за брз увид."}</span>
+        <span>5. За споредба и анализа продолжи во `Извештаи`.</span>
       </div>
 
       <div className="panel-grid panel-grid--production">
         <div className="card-list">
-          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminMode).length === 0 && (
-            <div className="empty-state">Нема снимени внесови за {adminMode === "pekara" ? "Пекара" : "Печењара"}.</div>
+          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminDisplayMode).length === 0 && (
+            <div className="empty-state">Нема снимени внесови за {adminDisplayMode === "pekara" ? "Пекара" : adminDisplayMode === "pecenjara" ? "Печењара" : "Пијара"}.</div>
           )}
-          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminMode).map((entry) => (
+          {operatorEntriesQuery.data.data.filter((entry) => entry.mode === adminDisplayMode).map((entry) => (
             <article className="workflow-card" key={entry.id}>
               <div className="workflow-card__top">
                 <span className="pill">
@@ -993,9 +1066,18 @@ export function ProductionPage() {
                   locationsQuery.data?.data.find((location) => location.locationId === entry.locationId)?.nameMk ?? entry.locationName
                 )}
               </h4>
-              <p>Модул: {entry.mode === "pekara" ? "Пекара" : "Печењара"}</p>
+              <p>Модул: {entry.mode === "pekara" ? "Пекара" : entry.mode === "pecenjara" ? "Печењара" : "Пијара"}</p>
               <p>Време: {formatAdminTimestamp(entry.createdAt)}</p>
               <p>Артикли: {entry.items.map((item) => `${item.itemName} (${item.quantity})`).join(", ")}</p>
+              {entry.mode === "pijara" ? (
+                <p>
+                  Класа Б:{" "}
+                  {entry.items
+                    .filter((item) => item.classB && item.classBQuantity > 0)
+                    .map((item) => `${item.itemName} (${item.classBQuantity})`)
+                    .join(", ") || "Нема"}
+                </p>
+              ) : null}
               {entry.photoName ? (
                 <button
                   type="button"

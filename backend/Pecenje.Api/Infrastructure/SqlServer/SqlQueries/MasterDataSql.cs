@@ -35,10 +35,13 @@ public static class MasterDataSql
             i.ItemId,
             i.Code,
             i.NameMk,
+            CAST('' AS nvarchar(50)) AS GroupCode,
             g.NameMk AS GroupName,
             i.SalesPrice,
             i.WasteLimitPct,
-            i.IsActive
+            i.IsActive,
+            CAST(NULL AS nvarchar(50)) AS ClassBCode,
+            CAST(NULL AS nvarchar(200)) AS ClassBName
         FROM dbo.Items i
         INNER JOIN dbo.ItemGroups g ON g.ItemGroupId = i.ItemGroupId
         ORDER BY i.NameMk;
@@ -50,10 +53,13 @@ public static class MasterDataSql
             INSERTED.ItemId,
             INSERTED.Code,
             INSERTED.NameMk,
+            CAST('' AS nvarchar(50)) AS GroupCode,
             @GroupName AS GroupName,
             INSERTED.SalesPrice,
             INSERTED.WasteLimitPct,
-            INSERTED.IsActive
+            INSERTED.IsActive,
+            CAST(NULL AS nvarchar(50)) AS ClassBCode,
+            CAST(NULL AS nvarchar(200)) AS ClassBName
         VALUES (@Code, @NameMk, @ItemGroupId, @SalesPrice, @WasteLimitPct, @IsActive);
         """;
 
@@ -70,10 +76,13 @@ public static class MasterDataSql
             INSERTED.ItemId,
             INSERTED.Code,
             INSERTED.NameMk,
+            CAST('' AS nvarchar(50)) AS GroupCode,
             @GroupName AS GroupName,
             INSERTED.SalesPrice,
             INSERTED.WasteLimitPct,
-            INSERTED.IsActive
+            INSERTED.IsActive,
+            CAST(NULL AS nvarchar(50)) AS ClassBCode,
+            CAST(NULL AS nvarchar(200)) AS ClassBName
         WHERE ItemId = @ItemId;
         """;
 

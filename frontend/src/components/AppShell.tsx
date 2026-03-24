@@ -36,7 +36,6 @@ export function AppShell() {
         <main className="content content--operator">
           <header className="topbar topbar--operator">
             <div>
-              <img className="app-logo app-logo--topbar" src="/zito-logo.png" alt="Жито маркети" />
               <p className="topbar-eyebrow">Оператор</p>
               <h2>{operatorTitle}</h2>
             </div>
@@ -62,7 +61,6 @@ export function AppShell() {
       <main className="content content--operator">
         <header className="topbar topbar--operator">
           <div>
-            <img className="app-logo app-logo--topbar" src="/zito-logo.png" alt="Жито маркети" />
             <p className="topbar-eyebrow">Администратор</p>
             <h2>{isHome ? "Админ модули" : "Админ модул"}</h2>
           </div>
