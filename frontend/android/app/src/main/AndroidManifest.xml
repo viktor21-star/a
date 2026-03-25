@@ -3,10 +3,10 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher_mark"
+        android:icon="@drawable/ic_launcher_mark_104"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:roundIcon="@drawable/ic_launcher_mark"
+        android:roundIcon="@drawable/ic_launcher_mark_104"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
